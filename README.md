@@ -54,8 +54,8 @@ _「云上的访问权限管理体系。」_
 
 ### 概况
 
-* __Identity-Based Policy（IBP）是附在用户、角色身上的访问权限。__如果没有 IBP 用户无法访问资源。
-* __Resource-Based Policy（RBP）是附在资源身上的访问权限。__只有部分资源有 RBP。
+* __Identity-Based Policy（IBP）是附在用户、角色身上的访问权限。__ 如果没有 IBP 用户无法访问资源。
+* __Resource-Based Policy（RBP）是附在资源身上的访问权限。__ 只有部分资源有 RBP。
 * __Policy 包含多个 Statement。__
   * Statement 必须包含：Effect（允许 / 拒绝）、Action、Resource。
   * Statement 可选包含：Condition。
@@ -68,19 +68,19 @@ _「功能丰富的对象存储。」_
 ### 概况
 
 * __第一个 AWS 服务。__
-* __3 AZ 多副本。__11 个 9 的数据耐久度；3 个 9 的 SLA。
-* __事件触发。__使用 __Events__ 机制可以在文件上传、文件修改等事件发生时触发 __Lambda__。
-* __支持使用 Service Gateway 不走公网访问。__Service Gateway 不额外收费，推荐使用。
-* __扁平化存储。__没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
+* __3 AZ 多副本。__ 11 个 9 的数据耐久度；3 个 9 的 SLA。
+* __事件触发。__ 使用 __Events__ 机制可以在文件上传、文件修改等事件发生时触发 __Lambda__。
+* __支持使用 Service Gateway 不走公网访问。 __Service Gateway 不额外收费，推荐使用。
+* __扁平化存储。 __没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
 
 ### 权限
 
-* __有 Access Control List（ACL）、RBP 两种权限控制体系__。二选一即可，通常使用 RBP。
-* __ACL 以用户为单位来赋予权限。__需要使用 S3 专用的 Canonical ID 来指代用户，在 Bucket 的 ACL 页面可以找到。
-* __ACL 只有读、写、读取权限、写入权限、完全控制几种权限设置。__采用 XML 形式存储。
-* __ACL 默认赋予 Bucket 拥有者全部权限。__拥有者不再需要额外设置 RBP。
+* __有 Access Control List（ACL）、RBP 两种权限控制体系。__ 二选一即可，通常使用 RBP。
+* __ACL 以用户为单位来赋予权限。__ 需要使用 S3 专用的 Canonical ID 来指代用户，在 Bucket 的 ACL 页面可以找到。
+* __ACL 只有读、写、读取权限、写入权限、完全控制几种权限设置。__ 采用 XML 形式存储。
+* __ACL 默认赋予 Bucket 拥有者全部权限。__ 拥有者不再需要额外设置 RBP。
 * __非 Bucket 拥有者需要在桶上设置 RBP 并持有对应的 IBP 才能访问。__
-* __有「Block Public Access」的设置。__针对 Bucket 的设置。
+* __有「Block Public Access」的设置。__ 针对 Bucket 的设置。
   * 防止新上传对象公开访问，开启后会抛弃新上传对象的公开访问权限。
   * 防止所有对象公开访问，开启后会忽略对象所附着的公开访问权限。
 
@@ -94,13 +94,13 @@ _「功能丰富的对象存储。」_
 
 ### 踩坑
 
-* 🇨🇳 __不支持 Global Endpoint。__在中国必须使用 Regional Endpoint，否则会返回 `404`。
-  * 🚚 __RegionalDomainName。__在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
-* 🇨🇳 __Cross-Region Replication 不支持非中国大陆 Region。__跨区复制仅能在中国大陆 Region 之间进行。
+* 🇨🇳 __不支持 Global Endpoint。__ 在中国必须使用 Regional Endpoint，否则会返回 `404`。
+  * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
+* 🇨🇳 __Cross-Region Replication 不支持非中国大陆 Region。__ 跨区复制仅能在中国大陆 Region 之间进行。
 
 ## S3 Athena
 
-「直接针对 S3 上存的半结构化数据跑 SQL。」
+_「直接针对 S3 上存的半结构化数据跑 SQL。」_
 
 ## EC2（Elastic Cloud Compute）
 
@@ -108,11 +108,11 @@ _「云上虚拟机。」_
 
 ### 概览
 
-* __默认密钥对登录。__若要密码登录虚拟机，需要进行额外的操作。
+* __默认密钥对登录。__ 若要密码登录虚拟机，需要进行额外的操作。
 
 ### Amazon Linux
 
-* __基于 RHEL 的开源 Linux。__使用 yum 包管理工具。
+* __基于 RHEL 的开源 Linux。__ 使用 yum 包管理工具。
 * __经过审核、强化并预装 AWS 工具包。__
 * 🇨🇳 __中国区没有 Amazon Linux 2。__
 
@@ -145,15 +145,15 @@ _「托管的 Elasticsearch + Kibana 应用。」_
 
 ### 概况
 
-* __两种网络模式。__置于公网，或者置于 VPC 内。
-* __访问策略__。需要在访问策略中允许之后，才可访问。
+* __两种网络模式。__ 置于公网，或者置于 VPC 内。
+* __访问策略。__ 需要在访问策略中允许之后，才可访问。
 
 ### 踩坑
 
-* __置于 VPC 中的 Domain 无法从公网访问。__因为 VPC 内的 ES 仅有私有 IP 地址，没有公网 IP 地址。（见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=279437)）
-* __访问策略的 Resource 需加入路径。__支持确定的路径或 `*`，如没有路径会报错。正确示范：`arn:aws-cn:es:cn-northwest-1:1234567890:domain/my-es/*`，注意最后的 `/*`。
-* __循环权限依赖。__要访问 ES，需要创建 Role，需要知道 ES 的 ARN；而创建 ES 的时候，需要设置访问策略，需要知道 Role 的 ARN。解决方案见 CloudFormation 踩坑部分。
-* 🚚 __CFn 仅支持 1-AZ 和 2-AZ。__`ZoneAwarenessEnabled: True` 代表 2-AZ，但管理控制台中支持 3-AZ。（见 [ElasticsearchClusterConfig.ZoneAwarenessEnabled](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-elasticsearch-domain-elasticsearchclusterconfig.html)）
+* __置于 VPC 中的 Domain 无法从公网访问。__ 因为 VPC 内的 ES 仅有私有 IP 地址，没有公网 IP 地址。（见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=279437)）
+* __访问策略的 Resource 需加入路径。__ 支持确定的路径或 `*`，如没有路径会报错。正确示范：`arn:aws-cn:es:cn-northwest-1:1234567890:domain/my-es/*`，注意最后的 `/*`。
+* __循环权限依赖。__ 要访问 ES，需要创建 Role，需要知道 ES 的 ARN；而创建 ES 的时候，需要设置访问策略，需要知道 Role 的 ARN。解决方案见 CloudFormation 踩坑部分。
+* 🚚 __CFn 仅支持 1-AZ 和 2-AZ。__ `ZoneAwarenessEnabled: True` 代表 2-AZ，但管理控制台中支持 3-AZ。（见 [ElasticsearchClusterConfig.ZoneAwarenessEnabled](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-elasticsearch-domain-elasticsearchclusterconfig.html)）
 
 ## CFn（CloudFormation）
 
@@ -172,13 +172,13 @@ _「封装成程序代码的 CFn。」_
 
 ### 总览
 
-* __基于 Node 和 TypeScript。__CLI 工具基于 Node。代码另支持 JavaScript、Python、Java、CSharp 等语言。
-* __转译成 CFn 模板。__CDK 代码仍然会转译成 CFn 模板进行部署。
-* __助手函数。__CDK 提供助手函数来简化模板编写。
+* __基于 Node 和 TypeScript。__ 命令行工具基于 Node。代码另支持 JavaScript、Python、Java、CSharp 等语言。
+* __转译成 CFn 模板。__ CDK 代码仍然会转译成 CFn 模板进行部署。
+* __助手函数。__ CDK 提供助手函数来简化模板编写。
 
 ### 概念
 
-* __Construct。__即封装成类的资源。
+* __Construct。__ 即封装成类的资源。
 
 ### 命令
 
