@@ -141,6 +141,9 @@ _「无服务器计算资源。」_
 
 ### 踩坑
 
+* 🚚 __Log Group 不会自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在记录之列，所以不会在 CFn Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
+  * 手动创建名为 `/aws/lambda/${lambdaFunctionName}` 的 Log Group 即可自动删除。
+
 ## ES（Elasticsearch Service）
 
 _「托管的 Elasticsearch + Kibana 应用。」_
@@ -193,8 +196,8 @@ _「封装成程序代码的 CFn。」_
 * 🇨🇳 __`cdk bootstrap` 中使用的 CFn 返回 Bucket 的 Global URL，导致不可创建 ChangeSet。__ CFn 中的返回值为 `DomainName` 而不是 `RegionalDomainName`，而中国不支持 Global Endpoint，导致错误。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
   * 修改 `node_modules/aws-cdk/lib/api/bootstrap-environment.js` 中的 `"StagingBucket", "DomainName"` 为 `"StagingBucket", "RegionalDomainName"`。
 * __S3、LogGroup 资源默认 `UpdatePolicy` / `DeletionPolicy` 为 `Retain`。__ 此项与 CFn 的默认行为相反。（版本：v1.2.0，见 [#2601](https://github.com/aws/aws-cdk/issues/2601)）
-* __缺乏 `DeletionPolicy` 抽象。__ 需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
-  * `(bucket.node.defaultChild as s3.CfnBucket).applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)` 
+* __缺乏 `DeletionPolicy` 抽象。__ 部分资源需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
+  * `(res.node.defaultChild as s3.CfnXXXX).applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)` 
 
 ## IoT Greengrass
 
