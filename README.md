@@ -70,8 +70,8 @@ _「功能丰富的对象存储。」_
 * __第一个 AWS 服务。__
 * __3 AZ 多副本。__ 11 个 9 的数据耐久度；3 个 9 的 SLA。
 * __事件触发。__ 使用 __Events__ 机制可以在文件上传、文件修改等事件发生时触发 __Lambda__。
-* __支持使用 Service Gateway 不走公网访问。 __Service Gateway 不额外收费，推荐使用。
-* __扁平化存储。 __没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
+* __支持使用 Service Gateway 不走公网访问。__ Service Gateway 不额外收费，推荐使用。
+* __扁平化存储。 __ 没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
 
 ### 权限
 
@@ -110,15 +110,17 @@ _「云上虚拟机。」_
 
 * __默认密钥对登录。__ 若要密码登录虚拟机，需要进行额外的操作。
 
+### 踩坑
+
+## AMI（Amazon Machine Image）
+
+_「虚拟机镜像。」_
+
 ### Amazon Linux
 
 * __基于 RHEL 的开源 Linux。__ 使用 yum 包管理工具。
 * __经过审核、强化并预装 AWS 工具包。__
 * 🇨🇳 __中国区没有 Amazon Linux 2。__
-
-### 踩坑
-
-
 
 ## VPC（Virtual Private Cloud）
 
@@ -188,9 +190,11 @@ _「封装成程序代码的 CFn。」_
 
 ### 踩坑
 
-* 🇨🇳 __Bootstrap 使用的 CFn 返回 Bucket 的 Global URL，导致不可创建 ChangeSet。__ CFn 中的返回值为 Bucket.DomainName 而不是 Bucket.DomainName，而中国不支持 Global URL。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
+* 🇨🇳 __`cdk bootstrap` 中使用的 CFn 返回 Bucket 的 Global URL，导致不可创建 ChangeSet。__ CFn 中的返回值为 `DomainName` 而不是 `RegionalDomainName`，而中国不支持 Global Endpoint，导致错误。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
   * 修改 `node_modules/aws-cdk/lib/api/bootstrap-environment.js` 中的 `"StagingBucket", "DomainName"` 为 `"StagingBucket", "RegionalDomainName"`。
-* __S3、LogGroup 资源默认 UpdatePolicy / DeletionPolicy 为 Retain。__ 此项与 CFn 的默认行为相反。（版本：v1.2.0，见 [#2601](https://github.com/aws/aws-cdk/issues/2601)）
+* __S3、LogGroup 资源默认 `UpdatePolicy` / `DeletionPolicy` 为 `Retain`。__ 此项与 CFn 的默认行为相反。（版本：v1.2.0，见 [#2601](https://github.com/aws/aws-cdk/issues/2601)）
+* __缺乏 `DeletionPolicy` 抽象。__ 需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
+  * `(bucket.node.defaultChild as s3.CfnBucket).applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)` 
 
 ## IoT Greengrass
 
