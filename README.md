@@ -65,12 +65,21 @@ _「云上的访问权限管理体系。」_
 * __Policy 包含多个 Statement。__
   * Statement 必须包含：Effect（允许 / 拒绝）、Action、Resource。
   * Statement 可选包含：Condition。
-  * RBP 的 Statement 还包含 Principal（访问者）。
+  * RBP 的 Statement 还包含 Principal（访问者）。可以是别的账号下的 IAM User。
+* __账户有 Master Account 和 IAM User 两种。__ 一个用邮件登录，一个还需要输入 Account ID。
+  * 🇨🇳 中国区没有 Master Account，只有 IAM User。
+
+### IAM User / Group
+
+* __可以创建多个 IAM User 并置入 Group 之中。__ ✅ 应该为每个资源使用者创建 IAM User。
+  * ✅ 应尽量避免为单个 IAM User 赋权，而是为 Group 赋权并将 IAM User 加入，方便管理。
 
 ### Role
 
-* __Role 就是带权限的角色。__ 其他 IAM 用户、AWS 服务或者外部的已认证用户可以担任 Role 并且获得相应权限。
+* __Role 就是带权限的角色。__ 其他 IAM User、AWS 服务或者外部的已认证用户均可以担任 Role 并且获得相应权限。
   * 担任 Role 时访问者原来的的身份消失，这在 A 桶复制对象到 B 桶这样的场景下不方便，所以通常跨资源操作时会使用 RBP。
+  * 跨账号使用 Role 时，会先将 Role 授权给目标账号，然后由目标账号再自己授权给单个 IAM User。
+  * 权限名称为 `sts:AssumeRole`，因为担任 Role 实际上是 AWS Simple Token Service 出具了一个临时 Token 来给访问请求签名。
 
 ## S3（Simple Storage Service）
 
@@ -82,15 +91,17 @@ _「功能丰富的对象存储。」_
 * __3 AZ 多副本。__ 11 个 9 的数据耐久度；3 个 9 的 SLA。
 * __事件触发。__ 使用 __Events__ 机制可以在文件上传、文件修改等事件发生时触发 __Lambda__。
 * __支持使用 Service Gateway 不走公网访问。__ Service Gateway 不额外收费，推荐使用。
-* __扁平化存储。 __ 没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
+* __扁平化存储。__ 没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
 
 ### 权限
 
-* __有 Access Control List（ACL）、RBP 两种权限控制体系。__ 二选一即可，通常使用 RBP。
-* __ACL 以用户为单位来赋予权限。__ 需要使用 S3 专用的 Canonical ID 来指代用户，在 Bucket 的 ACL 页面可以找到。
-* __ACL 只有读、写、读取权限、写入权限、完全控制几种权限设置。__ 采用 XML 形式存储。
-* __ACL 默认赋予 Bucket 拥有者全部权限。__ 拥有者不再需要额外设置 RBP。
-* __非 Bucket 拥有者需要在桶上设置 RBP 并持有对应的 IBP 才能访问。__
+* __有 Access Control List（ACL）、RBP 两种权限控制体系。__ ✅ 通常使用 RBP。
+* __ACL 以账号为单位来赋予权限。__ 需要使用 S3 专用的 Canonical ID 来指代账号，在 Bucket 的 ACL 页面可以找到。
+  * __ACL 需要在 Bucket 和每个文件上设置。__ 非常不方便。
+  * __ACL 只有读、写、读取权限、写入权限、完全控制几种权限设置。__ 采用 XML 形式存储。
+  * __ACL 默认赋予 Bucket 拥有者全部权限。__ 所以拥有者不再需要额外设置 RBP 即可访问新建的 Bucket。
+  * __ACL 也支持「已登录用户」、「所有人」以及「日志组」几个分组。__ 尽量不要使用。
+* __非 Bucket 拥有者需要在桶上设置 RBP 并持有对应的 IBP 才能访问。__ 除非在 ACL 里面专门允许。
 * __有「Block Public Access」的设置。__ 针对 Bucket 的设置。✅ 建议打开。
   * 防止新上传对象公开访问，开启后会抛弃新上传对象的公开访问权限。
   * 防止所有对象公开访问，开启后会忽略对象所附着的公开访问权限。
@@ -108,6 +119,7 @@ _「功能丰富的对象存储。」_
 * 🇨🇳 __不支持 Global Endpoint。__ 在中国必须使用 Regional Endpoint，否则会返回 `404`。
   * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
 * 🇨🇳 __Cross-Region Replication 不支持非中国大陆 Region。__ 跨区复制仅能在中国大陆 Region 之间进行。
+* __ACL 中的 Everyone 指的是全世界。__ 即全天下的人都可以通过 HTTP 访问。
 
 ## S3 Athena
 
@@ -123,6 +135,22 @@ _「云上虚拟机。」_
 
 ### 踩坑
 
+## ELB（Elastic Load Balancing）
+
+_「托管的 4/7 层负载均衡器。」_
+
+### ALB（Application Load Balancer）
+
+* __OSI 7 层负载均衡。__ 类似 Nginx。
+  * __支持按 Host 转发。__ 在管理控制台中需要先创建再设置。
+* __实际上是弹性集群。__ 通过 DNS 来指向不同机器。
+* ✅ __可以记录访问日志到 S3。__ 方便调试。
+
+### NLB（Network Load Balancer）
+
+* __OSI 4 层负载均衡。__ 基于 HyperPlane，10 微秒级请求转发速度。
+* __静态 IP。__ 支持内部静态 IP，每个 Subnet 一个。
+
 ## AMI（Amazon Machine Image）
 
 _「虚拟机镜像。」_
@@ -136,6 +164,26 @@ _「虚拟机镜像。」_
 ## VPC（Virtual Private Cloud）
 
 _「云上的虚拟专属网络。」_
+
+### 总览
+
+* __IP 地址保留。__ 1 号是默认网关，2 号是 DHCP，3 号预留未来使用，255 号因为不支持 Broadcasting 而做了保留。
+* __不支持 Broadcasting。__ 目前也不支持 Multicasting。
+* __不支持监听模式。__ 即 Promiscus 模式。
+* __Network ACL 是针对整个 VPC 的无状态端口防火墙。__ 必须设置双向开放，网络包才能双向流动。
+
+### Subnet
+
+* __单 AZ 虚拟子网。__ 不能跨 AZ。
+* __必须从 VPC 的 CIDR 中选择子集。__ 并且统一 VPC 下 Subnet 之间不能重叠。
+* __每个 Subnet 至少带一个路由表。__ 路由条目中的规则越具体，优先级越高。
+  * __路由表中有一条记录指向 IGW 则为 Public Subnet。__ 否则就是 Private。
+
+### Gateway
+
+* __Internet Gateway（IGW）。__ 双向互联网网关，每个 VPC 一个。
+* __NAT Gateway（NAT-GW）。__ 出口向互联网网关（IPv4），需置于 Public Subnet 中。
+* __Ingress / Egress Gateway。__ 入口 / 出口向互联网网关（IPv6）。
 
 ### 踩坑
 
@@ -212,7 +260,7 @@ _「封装成程序代码的 CFn。」_
 
 ## IoT Greengrass
 
-_「边缘计算的控制器。」_
+_「边缘计算控制器。」_
 
 ## AppSync
 
@@ -220,7 +268,7 @@ _「托管的 GraphQL。」_
 
 ## RDS Aurora
 
-_「云原生数据库。」_
+_「托管的云原生数据库。」_
 
 
 
