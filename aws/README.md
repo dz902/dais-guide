@@ -12,16 +12,10 @@
 * 🚚 = 服务在 CFn / CDK 中的情况
 * ✅ = 建议执行的操作
 * 🈲 = 不建议执行的操作
+* 💢 = 需要注意的坑
 
 ## 目录
 
-* 中国大陆特有
-* IAM
-* S3
-* Lambda
-* ES
-* CFn
-* CDK
 
 ## 🇨🇳 中国区特有情况
 
@@ -91,7 +85,7 @@ _「云上的访问权限管理体系。」_
 ### Role
 
 * __Role 就是带权限的角色。__ 其他 IAM User、AWS 服务或者外部的已认证用户均可以担任 Role 并且获得相应权限。
-  * 担任 Role 时访问者原来的的身份消失，这在 A 桶复制对象到 B 桶这样的场景下不方便，所以通常跨资源操作时会使用 RBP。
+  * 💢 __担任 Role 时访问者原来的身份消失。__ 这在 A 桶复制对象到 B 桶这样的场景下不方便，所以通常跨资源操作时会使用 RBP。
   * 跨账号使用 Role 时，会先将 Role 授权给目标账号，然后由目标账号再自己授权给单个 IAM User。
   * 权限名称为 `sts:AssumeRole`，因为担任 Role 实际上是 AWS Simple Token Service 出具了一个临时 Token 来给访问请求签名。
 
@@ -107,33 +101,50 @@ _「功能丰富的对象存储。」_
 * __支持使用 Service Gateway 不走公网访问。__ Service Gateway 不额外收费，推荐使用。
 * __扁平化存储。__ 没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
 
+### Bucket
+
+* __S3 是 Global 服务，但 Bucket 有区域之分。__ 区域选择会影响访问速度。
+  * 🇨🇳 中国区除外。中国区的 S3 无法看到 Global 的 Bucket。
+* __不同区域的 Bucket 可以通过 Cross-Region Replication（CRR）自动同步。__  
+  * 🇨🇳 __CRR 不支持同步出、入中国区。__ 中国区的 CRR 仅能在中国区 Region 之间进行，Global Region 的 CRR 无法同步至中国区。
+
 ### 权限
 
 * __有 Access Control List（ACL）、RBP 两种权限控制体系。__ ✅ 通常使用 RBP。
-* __ACL 以账号为单位来赋予权限。__ 需要使用 S3 专用的 Canonical ID 来指代账号，在 Bucket 的 ACL 页面可以找到。
+* 🈲 __ACL 以账号为单位来赋予权限。__ 需要使用 S3 专用的 Canonical ID 来指代账号，在 Bucket 的 ACL 页面可以找到。
+  * __ACL 默认赋予 Bucket 拥有者全部权限。__ 所以拥有者不再需要额外设置 RBP 即可访问新建的 Bucket。
   * __ACL 需要在 Bucket 和每个文件上设置。__ 非常不方便。
   * __ACL 只有读、写、读取权限、写入权限、完全控制几种权限设置。__ 采用 XML 形式存储。
-  * __ACL 默认赋予 Bucket 拥有者全部权限。__ 所以拥有者不再需要额外设置 RBP 即可访问新建的 Bucket。
-  * __ACL 也支持「已登录用户」、「所有人」以及「日志组」几个分组。__ 尽量不要使用。
+  * __ACL 也支持「已登录用户」、「所有人」以及「日志组」几个分组。__ 不建议使用。
+  * __ACL 中的「所有人」指的是全世界。__ 即全天下的人都可以访问。
 * __非 Bucket 拥有者需要在桶上设置 RBP 并持有对应的 IBP 才能访问。__ 除非在 ACL 里面专门允许。
 * __有「Block Public Access」的设置。__ 针对 Bucket 的设置。✅ 建议打开。
   * 防止新上传对象公开访问，开启后会抛弃新上传对象的公开访问权限。
   * 防止所有对象公开访问，开启后会忽略对象所附着的公开访问权限。
 
-### 细节
+### Endpoint
 
 * __Global / Local Endpoint。__
+  * 🇨🇳 __中国区不支持 Global Endpoint。__ 在中国区必须使用 Regional Endpoint，否则会返回 `404`。
+
+### S3 Events
+
+* __在上传、修改等事件时触发 Lambda。__
+  * 💢 __不确保及时、准确性。__ 即可能会有 1 分钟以上的延时，可能会有重复的事件，可能会漏发事件。（见 [Link](http://www.hydrogen18.com/blog/aws-s3-event-notifications-probably-once.html?ck_subscriber_id=527212891)）
+  * 🈲 __不推荐用来处理有强一致性需求的任务。__ ✅ 可以用于做一些简单的统计，特别是可耐受少量信息冗余、缺失的。
 
 ### S3 Select
 
-* __直接对 S3 上存储的半结构化数据进行视图过滤。__
+* __直接对 S3 上存储的半结构化数据进行视图过滤。__ 基于 PartiQL 语言。
+
+### 数据湖
+
+* __数据湖核心。__ S3 是 AWS 数据湖的核心存储机制，也是数据湖的「湖」本体，大部分分析类服务的持久化存储由 S3 提供。
 
 ### 踩坑
 
-* 🇨🇳 __不支持 Global Endpoint。__ 在中国区必须使用 Regional Endpoint，否则会返回 `404`。
   * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
-* 🇨🇳 __Cross-Region Replication 不支持往非中国区复制。__ 跨区复制仅能在中国区 Region 之间进行。
-* __ACL 中的 Everyone 指的是全世界。__ 即全天下的人都可以通过 HTTP 访问。
+
 
 ## Athena
 
@@ -249,15 +260,21 @@ _「无服务器计算资源。」_
 
 * __采用 Firecracker Micro-VM 内核。__
 * __以「内存/100ms」为单位来收费。__
+* __默认不放在 VPC 内。__
 
 ### 踩坑
 
 * 🚚 __Log Group 不会自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在记录之列，所以不会在 CFn Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
   * 手动创建名为 `/aws/lambda/${lambdaFunctionName}` 的 Log Group 即可自动删除。
+* 🚚 __注意 Lambda 函数 Role 需要有足够权限。__ 特别注意对 Log Group 的操作，以及对各项资源的操作。
+  * 如果没有 Log Group 创建权限则不会自动创建 Log Group，如果没有写入 Log Group Stream 权限则不会自动写入，但二者均不会报错。
+  * ✅ 可使用部分 Managed Policy，比如 AWSLambdaBasicExecutionRole 以及 AWSLambdaS3ExecutionRole。
 
 ## ES（Elasticsearch Service）
 
 _「托管的 Elasticsearch + Kibana 应用。」_
+
+__快速通道__ >> [使用手册](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/what-is-amazon-elasticsearch-service.html)
 
 ### 概况
 
@@ -288,6 +305,8 @@ _「基建即代码工具。」_
 
 _「封装成程序代码的 CFn。」_
 
+__快速通道__ >> [API 文档](https://docs.aws.amazon.com/cdk/api/latest/versions.html)
+
 ### 总览
 
 * __基于 Node 和 TypeScript。__ 命令行工具基于 Node。代码另支持 JavaScript、Python、Java、CSharp 等语言。
@@ -296,7 +315,8 @@ _「封装成程序代码的 CFn。」_
 
 ### 概念
 
-* __Construct。__ 即封装成类的资源。
+* __Construct。__ 即封装好的资源和配置。
+  * 💢 __很多服务还没有 Construct。__ 可退回到使用 `Cfn-` 前缀的原始类。
 
 ### 命令
 
@@ -309,8 +329,8 @@ _「封装成程序代码的 CFn。」_
 * 🇨🇳 __`cdk bootstrap` 中使用的 CFn 返回 Bucket 的 Global URL，导致不可创建 ChangeSet。__ CFn 中的返回值为 `DomainName` 而不是 `RegionalDomainName`，而中国区不支持 Global Endpoint，导致错误。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
   * 修改 `node_modules/aws-cdk/lib/api/bootstrap-environment.js` 中的 `"StagingBucket", "DomainName"` 为 `"StagingBucket", "RegionalDomainName"`。
 * __S3、LogGroup 资源默认 `UpdatePolicy` / `DeletionPolicy` 为 `Retain`。__ 此项与 CFn 的默认行为相反。（版本：v1.2.0，见 [#2601](https://github.com/aws/aws-cdk/issues/2601)）
-* __缺乏 `DeletionPolicy` 抽象。__ 部分资源需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
-  * `(res.node.defaultChild as s3.CfnXXXX).applyRemovalPolicy(cdk.RemovalPolicy.DESTROY)` 
+* __部分资源缺乏 `DeletionPolicy` 抽象。__ 部分资源需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
+  * ✅ 对于 Construct，可以在传入参数时直接带 `removalPolicy: cdk.RemovalPolicy.DESTROY`
 
 ## IoT Greengrass
 
@@ -347,9 +367,9 @@ _「云上监控平台。」_
 ### 总览
 
 * __Metrics 是应用指标。__
-* __Events 是消息队列。__ 有相对独立的 ARN 和服务名字（events）。
+* __Events 是消息队列。__ 有相对独立的 ARN 和 API 名字（events）。
   * __后续发展成了 EventBridge。__ 🇨🇳 中国区暂时没有。
-* __Logs 是日志收集和查看器。__ 有相对独立的 ARN 和服务名字（logs）。
+* __Logs 是日志收集和查看器。__ 有相对独立的 ARN 和 API 名字（logs）。
   * __有 Logs Insights 可以直接对日志进行查询。__ 🇨🇳 中国区暂时没有。
 
 ## CloudTrail
