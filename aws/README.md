@@ -80,11 +80,20 @@ _「云上的访问权限管理体系。」_
 * __账户有 Master Account 和 IAM User 两种。__ 一个用邮件登录，一个还需要输入 Account ID。
   * 🇨🇳 中国区没有 Master Account，只有 IAM User。
 
+### Root Account
+
+* __Root Account 是 AWS 账号体系下最高管理者账号。__ 即注册时的第一个账号，只需使用邮箱、密码登录，具备完整权限。
+  * 🇨🇳 中国区没有 Root Account 概念，所有账号均为 IAM User，登录时需要同时输入 Account ID 以及邮箱、密码。
+  * 💢 注意 IAM User 拥有删除自己的权限，删除后要恢复非常麻烦。
+  * 🈲 __强烈建议不使用 Root Account 进行日常操作。__
+
 ### IAM User / Group
 
 * __可以创建多个 IAM User 并置入 Group 之中。__ 
   * ✅ 应该为每个资源使用者创建 IAM User。
   * ✅ 应尽量避免为单个 IAM User 赋权，而是为 Group 赋权并将 IAM User 加入，方便管理。
+* __IAM User 登录时需要提供 Account ID 以及邮箱、密码。__
+  * 也可以使用专属登录页面链接。
 
 ### Role
 
@@ -92,6 +101,10 @@ _「云上的访问权限管理体系。」_
   * 💢 __担任 Role 时访问者原来的身份消失。__ 这在 A 桶复制对象到 B 桶这样的场景下不方便，所以通常跨资源操作时会使用 RBP。
   * 跨账号使用 Role 时，会先将 Role 授权给目标账号，然后由目标账号再自己授权给单个 IAM User。
   * 权限名称为 `sts:AssumeRole`，因为担任 Role 实际上是 AWS Simple Token Service 出具了一个临时 Token 来给访问请求签名。
+
+### MFA（Multi-Factor Authentication）
+
+* ✅ __多因子认证要求用户在登录使用额外的一次性密码。__ 推荐使用，至少应该在 Root Account 或管理员账号上启用。
 
 ## S3（Simple Storage Service）
 
