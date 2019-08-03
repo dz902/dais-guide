@@ -9,7 +9,8 @@
 ## 图例
 
 * 🇨🇳 = 宁夏和北京 Region（中国大陆 Region，下简称「中国区」）相关
-* 🚚 = 服务在 CFn / CDK 中的情况
+* 🚚 = 在 CFn / CDK 中的情况
+* 🚥 = 在 CLI 工具中的情况
 * ✅ = 建议执行的操作
 * 🈲 = 不建议执行的操作
 * 💢 = 需要注意的坑
@@ -147,6 +148,7 @@ _「功能丰富的对象存储。」_
 ### 踩坑
 
   * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
+  * 🚥 __无法从 CLI 获得 ARN。__ S3 的 CLI 没有提供任何获得 ARN 的方法，用户只能从 Console 复制，或者自己组成 ARN，需考虑中国区或 GovCloud 的名称差异问题。
 
 
 ## Athena
@@ -241,7 +243,6 @@ _「虚拟机镜像。」_
 
 * __基于 RHEL 的开源 Linux。__ 使用 `yum` 包管理工具。
 * __经过审核、强化并预装 AWS 工具包。__
-* 🇨🇳 __中国区暂时没有 Amazon Linux 2。__
 
 ## VPC（Virtual Private Cloud）
 
@@ -274,9 +275,31 @@ _「云上的虚拟专属网络。」_
   * 设置路由后，Private Subnet 的实例可以通过 NAT-GW 单向访问互联网，用于下载更新包等。
 * __Ingress / Egress Gateway。__ 入口 / 出口向互联网网关（IPv6）。
 
-### 踩坑
+### EIP（Elastic IP）
 
-* __非 Amazon Linux 使用双 ENI 需要自己配置操作系统路由。__ 否则可能出现无法访问的情况。
+* __同时固定公网和私网 IP。__ 公网 IP 从 AWS 自有 IP 池子中随机选取。
+
+### ENI（Elastic Network Interface）
+
+* __虚拟网卡。__
+* 💢 __非 Amazon Linux 使用双 ENI 需要自己配置操作系统路由。__ 否则可能出现无法访问的情况。
+
+### Flow Logs
+
+* __记录 VPC、Subnet 内所有 ENI 上网络 Packet 的流动。__ 也可只针对单个 ENI 做记录。
+* __有 ACCEPT / REJECT 两种状态。__ ACCEPT 是正常放行的流量，REJECT 是被 Security Group / ACL 阻挡的流量。
+* __可保存至 CloudWatch Logs 或 S3 Bucket。__ 并自动创建所需权限。 
+  * 🇨🇳 __S3 Bucket 如有原来带有 `aws-cn` 的权限会出错。__ `aws-cn` 中间的 `-` 会被丢掉，导致「MalformedPolicy - Invalid principal in policy」错误。
+  * 可以到 CloudTrail 中找到该条 API 调用，将 Bucket Policy 部分复制出来，加上 `-`，手动覆盖原权限。
+
+### Site-to-Site VPN
+
+* __AWS 提供托管 VPN 方案打通多个隔离网络。__
+* __VGW（Virtual Gateway） 是 AWS 侧的 VPN 网关。__ Customer Gateway 是客户侧的网关。
+  * 💢 __只能由 Customer Gateway 一侧发起请求。__ AWS 侧无法发起请求。
+  * 如有双向沟通需要可使用 Openswan。
+* __用户需自行准备 Customer Gateway 硬件或软件。__ AWS 上创建 Customer Gateway 的意思是「创建 Customer Gateway 对应的配置」。
+  * __AWS 提供已经测试过可用的软硬件路由列表。__
 
 ## Lambda
 
@@ -293,6 +316,8 @@ _「无服务器计算资源。」_
 * __支持多种语言环境。__
 * __可使用 Layers 来附加程序所需的库。__
 * __经过程序触发。__ 不能直接触发，需经过程序触发，比如 S3 Events、API Gateway 等。
+* __可以通过 Environment 变量传入参数。__ Function 将可以访问这些参数。
+  * 🇨🇳 中国区暂时不支持。
 
 ### 踩坑
 
@@ -301,6 +326,7 @@ _「无服务器计算资源。」_
 * 🚚 __注意 Lambda 函数 Role 需要有足够权限。__ 特别注意对 Log Group 的操作，以及对各项资源的操作。
   * 如果没有 Log Group 创建权限则不会自动创建 Log Group，如果没有写入 Log Group Stream 权限则不会自动写入，但二者均不会报错。
   * ✅ 可使用部分 Managed Policy，比如 AWSLambdaBasicExecutionRole 以及 AWSLambdaS3ExecutionRole。
+  * 🚚 注意 Managed Policy 名字有的前面有前缀（比如 `service-role/`、`job-role/`），有的没有前缀。在 Console 中不会显示前缀，但在 CDK 中使用 `fromAwsManagedPolicyName()` 时需要把前缀加上。
 
 ## ES（Elasticsearch Service）
 
@@ -400,10 +426,20 @@ _「云上监控平台。」_
 ### 总览
 
 * __Metrics 是应用指标。__
+
+### Events（CloudWatch Events）
+
 * __Events 是消息队列。__ 有相对独立的 ARN 和 API 名字（events）。
   * __后续发展成了 EventBridge。__ 🇨🇳 中国区暂时没有。
+
+### Logs（CloudWatch Logs）
+
 * __Logs 是日志收集和查看器。__ 有相对独立的 ARN 和 API 名字（logs）。
   * __有 Logs Insights 可以直接对日志进行查询。__ 🇨🇳 中国区暂时没有。
+* __可以把日志转发到 Lambda。__
+  * 🇨🇳 __中国区暂不支持。__
+* __可以把日志转发到 Elasticsearch。__ 仅限 AWS 托管的 Elasticsearch。
+  * 🇨🇳 __中国区暂不支持。__
 
 ## CloudTrail
 
@@ -417,12 +453,14 @@ _「官方的 API 访问日志。」_
 
 _「托管的消息队列。」_
 
-### Firehose
+### Firehose（Kinesis Data Firehose）
 
 * __往各种地方输送数据。__ 支持 S3、Lambda、Elasticsearch 等等。
 * __支持数据转换。__ 输送数据之前用 Lambda 进行转换。
 
-### Video Streams
+### Video Streams（Kinesis Video Streams）
+
+* 🇨🇳 中国区暂未上线。
 
 ## ECS（Elastic Container Service）
 
