@@ -321,11 +321,11 @@ _「无服务器计算资源。」_
 
 ### 踩坑
 
-* 🚚 __Log Group 不会自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在记录之列，所以不会在 CFn Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
-  * 手动创建名为 `/aws/lambda/${lambdaFunctionName}` 的 Log Group 即可自动删除。
+* 🚚 __Log Group 无法在 Stack 删除或回退时自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在 Stack 资源之列，所以不会在 Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
+  * 可手动创建名为 `/aws/lambda/${lambdaFunctionName}` 的 Log Group，即可自动删除。
 * 🚚 __注意 Lambda 函数 Role 需要有足够权限。__ 特别注意对 Log Group 的操作，以及对各项资源的操作。
-  * 如果没有 Log Group 创建权限则不会自动创建 Log Group，如果没有写入 Log Group Stream 权限则不会自动写入，但二者均不会报错。
-  * ✅ 可使用部分 Managed Policy，比如 AWSLambdaBasicExecutionRole 以及 AWSLambdaS3ExecutionRole。
+  * 💢 如果没有 Log Group 创建权限则不会自动创建 Log Group，如果没有写入 Log Group Stream 权限则不会自动写入，但二者均不会报错。
+  * ✅ 可使用部分 Managed Policy，比如 AWSLambdaBasicExecutionRole。
   * 🚚 注意 Managed Policy 名字有的前面有前缀（比如 `service-role/`、`job-role/`），有的没有前缀。在 Console 中不会显示前缀，但在 CDK 中使用 `fromAwsManagedPolicyName()` 时需要把前缀加上。
 
 ## ES（Elasticsearch Service）
