@@ -309,10 +309,12 @@ _「云上的虚拟专属网络。」_
 
 * __AWS 提供托管 VPN 方案打通多个隔离网络。__
 * __VGW（Virtual Gateway） 是 AWS 侧的 VPN 网关。__ Customer Gateway 是客户侧的网关。
-  * 💢 __只能由 Customer Gateway 一侧发起请求。__ AWS 侧无法发起请求。
-  * 如有双向沟通需要可使用 Openswan。
-* __用户需自行准备 Customer Gateway 硬件或软件。__ AWS 上创建 Customer Gateway 的意思是「创建 Customer Gateway 对应的配置」。
+  * 💢 __只能由 Customer Gateway 一侧发起请求建立 VPN 管道。__ AWS 侧无法发起请求，但请求发起后网络包可以双向发送。（见 [Link 1](https://docs.aws.amazon.com/vpc/latest/adminguide/Introduction.html)、[Link 2](https://forums.aws.amazon.com/thread.jspa?threadID=106147)）
+  * 🇨🇳 中国区暂时不支持 Customer Gateway，可使用 Openswan。
+* __用户需自行准备 Customer Gateway 硬件或软件。__ 在 AWS 上「创建 Customer Gateway」指的是「生成 Customer Gateway 对应的配置」。
   * __AWS 提供已经测试过可用的软硬件路由列表。__
+* __Tunnel 1 是主管道，Tunnel 2 是备用管道。__ 见 [Link](https://community.spiceworks.com/how_to/143768-how-to-set-up-a-site-to-site-vpn-for-aws)。
+
 
 ## Lambda
 
@@ -528,7 +530,12 @@ _「托管的云原生 NoSQL 数据库。」_
 
 ## KMS（Key Management Service）
 
+## CLI（Command Line Interface）
 
+_「命令行界面。」_
+
+* ✅ __可使用内置 Autocompleter 提升体验。__ 参考 [Link](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-completion.html)。
+  * 🈲 原来的 AWS-Shell 工具已经没有在活跃开发，且集成不便，不推荐使用。
 
 
 
