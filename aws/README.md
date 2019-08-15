@@ -232,6 +232,10 @@ _「块存储服务。」_
 
 * ✅ __支持 KMS 全盘加密。__ 不影响 I/O 性能。
 
+### 踩坑
+
+* __`growpart` 在 CentOS 上可能执行成功但是仍然报错。__ 用户可尝试直接重启机器再看效果。
+
 ## ELB（Elastic Load Balancing）
 
 _「托管的 4/7 层负载均衡器。」_
@@ -551,6 +555,28 @@ _「命令行界面。」_
 ### 踩坑
 
 * 🈲 __如果自行 `export AWS_DEFAULT_REGION=xxx` 而 `xxx` 不存在，则后续所有的命令都可能报错。__ 错误信息：`botocore.exceptions.ProfileNotFound: The config profile (xxx) could not be found`。
+
+
+## API Gateway
+
+_「托管的 API 网关。」_
+
+* __API 设置好之后需要部署才能使用。__ 旧版 API 可以和新版并存。
+* __API 部署后会在 URI 后加入部署的 Stage 名作为路径。__ 可以通过自定义域名来避免。
+* __原来不支持把后台服务放到私有子网中。__ 现在可以通过 PrivateLink 以及 NLB 来支持。
+* __使用代理模式时可使用 `{proxy+}` 作为路径参数。__ 这是一个贪婪式参数，会尽量多地匹配所有路径上的字符，并存入 `{proxy}` 这个参数中。
+  * 在 Console 中使用 `{proxy+}` 会自动创建 `ANY` 方法并只能选择代理模式，可删除 `ANY` 方法并自行创建需要的方法。
+  * `{proxy+}` 和代理模式实际上是两个独立的功能。
+  * `{proxy+}` 中的 `proxy` 可以改成其他名字，但建议保留 `proxy` 以便识别。
+* __不能使用 `/res/{proxy+}` 的形式。__ 因为资源路径只允许纯参数或者纯静态，不允许混杂二者。
+  * 可先创建 `/res` 然后在其之下创建 `/{proxy+}`。
+
+### 踩坑
+
+* __路径信息不会自动添加到 Endpoint 上。__ 必须手动在 Endpoint 上添加静态路径，或者用路径参数捕捉后再添加动态路径。
+  * 即便使用代理模式也不会自动添加。
+* __测试 `POST` 方法时将默认使用 `application/json` 格式。__ 而非 Web 常见的 `application/x-www-form-urlencoded` 格式。
+  * 可在 Method Execution 界面手动添加 `Content-Type: application/x-www-form-urlencoded` 的 header 来覆盖。
 
 
 ## SQS（Simple Queue Service）
