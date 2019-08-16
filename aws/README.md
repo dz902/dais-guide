@@ -486,12 +486,20 @@ _「官方的 API 访问日志。」_
 
 _「托管的消息队列。」_
 
-### Firehose（Kinesis Data Firehose）
+### Data Streams
 
-* __往各种地方输送数据。__ 支持 S3、Lambda、Elasticsearch 等等。
-* __支持数据转换。__ 输送数据之前用 Lambda 进行转换。
+* 💢 __传递延迟较高。__ 目前仅支持亚秒级的传递延迟（200-1000ms）。（见 [Link](https://aws.amazon.com/about-aws/whats-new/2015/03/amazon-kinesis-propagation-delay-reduction/)、[Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
+  * 如需最大限度降低延迟，还应在客户端处降低轮询间隔。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/kinesis-low-latency.html)）
+  * 使用 Enhanced Fan-Out 推送机制可以降低到约 75ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
+  * 与之相对的，是 Apache Kafka 可以优化到个位数 ms 级的传递延迟。（见 [Link](https://engineering.linkedin.com/kafka/benchmarking-apache-kafka-2-million-writes-second-three-cheap-machines)）
 
-### Video Streams（Kinesis Video Streams）
+### Data Firehose
+
+* __输送数据专用。__ 消息队列常会充当传输数据时的缓存，所以专门提供了这个功能。
+  * 支持往 S3、Lambda、Elasticsearch 等目标位置输送数据。
+* __支持数据转换。__ 输送数据之前可以用 Lambda 进行格式转换。
+
+### Video Streams
 
 * 🇨🇳 中国区暂未上线。
 
@@ -571,11 +579,18 @@ _「托管的 API 网关。」_
 * __不能使用 `/res/{proxy+}` 的形式。__ 因为资源路径只允许纯参数或者纯静态，不允许混杂二者。
   * 可先创建 `/res` 然后在其之下创建 `/{proxy+}`。
 
+### Lambda
+
+* __Lambda Proxy 打开之后路径和请求中的参数可以从 `event` 中读取。__ 分别是 `event.pathParameters` 和 `event.queryStringParameters`。
+* __Console 中的设置变更有诸多 bug。__ 建议更改 Proxy 和 Execution Role 等设置的时候采取删除 Method 重建的方式。
+* 💢 __使用 Lambda Proxy 集成的 API 在返回值不符合格式要求时会产生 `502 Bad Gateway` 错误。__ 见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=246541)。
+  * 请仔细检查 `status` 和 `body`，尤其是 `body` 是否已经 `JSON.stringify()`。
+
 ### 踩坑
 
 * __路径信息不会自动添加到 Endpoint 上。__ 必须手动在 Endpoint 上添加静态路径，或者用路径参数捕捉后再添加动态路径。
   * 即便使用代理模式也不会自动添加。
-* __测试 `POST` 方法时将默认使用 `application/json` 格式。__ 而非 Web 常见的 `application/x-www-form-urlencoded` 格式。
+* __测试 `POST` 方法时将默认使用 `application/json` 格式。__ 不是 Web 常见的 `application/x-www-form-urlencoded` 格式。
   * 可在 Method Execution 界面手动添加 `Content-Type: application/x-www-form-urlencoded` 的 header 来覆盖。
 
 
