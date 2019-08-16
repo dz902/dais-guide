@@ -541,10 +541,19 @@ _「云的 7 层防火墙。」_
 
 _「托管的云原生 NoSQL 数据库。」_
 
+__快速通道 >>>__ [JavaScript API 手册](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html)
+
 * __从 Amazon.com 购物车需求发展而来。__
-* __有发表专门的论文。__
+  * 有论文。
 
 ### DynamoDB Streams
+
+### 踩坑
+
+* __Primary Key 如果包含 sort key，则意味着在 `getItem` 时必须同时提供 partition key 和 sort key。__
+  * Primary Key 是确保数据唯一性的依据，而 `getItem` 是取出单条数据，所以必须完整提供两个 key，否则会报「The provided key element does not match the schema」错误。
+  * 如果只想按照 partition key 来查询，可以使用 `query`。
+
 
 ## HyperPlane
 
@@ -569,6 +578,12 @@ _「命令行界面。」_
 
 _「托管的 API 网关。」_
 
+* __Edge-Optimized Endpoint 就是 API Gateway + CloudFront，使用全局统一的域名。__ Regional Endpoint 需要你按需自行配置 CloudFront。
+  * 🇨🇳 中国区暂时没有 Edge-Optimized Endpoint。
+  * 💢 如使用 Edge-Optimized Endpoint，由于使用了全局统一域名并仅路由到单个 Region 的 API Gateway，所以无法做双活容错、基于延迟的 DNS 路由等等。要达到这个效果可使用多个 Regional Endpoint。（见 [Link](https://aws.amazon.com/blogs/compute/building-a-multi-region-serverless-application-with-amazon-api-gateway-and-aws-lambda/)）
+
+### API 配置
+
 * __API 设置好之后需要部署才能使用。__ 旧版 API 可以和新版并存。
 * __API 部署后会在 URI 后加入部署的 Stage 名作为路径。__ 可以通过自定义域名来避免。
 * __原来不支持把后台服务放到私有子网中。__ 现在可以通过 PrivateLink 以及 NLB 来支持。
@@ -585,6 +600,9 @@ _「托管的 API 网关。」_
 * __Console 中的设置变更有诸多 bug。__ 建议更改 Proxy 和 Execution Role 等设置的时候采取删除 Method 重建的方式。
 * 💢 __使用 Lambda Proxy 集成的 API 在返回值不符合格式要求时会产生 `502 Bad Gateway` 错误。__ 见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=246541)。
   * 请仔细检查 `status` 和 `body`，尤其是 `body` 是否已经 `JSON.stringify()`。
+* 💢 __默认的超时只有 3s。__ 函数在初次执行时可能会超时。
+  * 在后续再执行函数时会效率会逐步提高到最优，所以为了避免性能损耗，会做 [Pre-warming](https://forums.aws.amazon.com/thread.jspa?threadID=232882)。
+* 💢 __Console 中的「Test」功能偶尔会使用旧代码。__ 修改函数并保存后，点击「Test」，日志现实仍然测试的是旧函数。
 
 ### 踩坑
 
