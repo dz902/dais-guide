@@ -252,6 +252,8 @@ _「托管的 4/7 层负载均衡器。」_
 
 * __OSI 4 层负载均衡。__ 基于 HyperPlane，10 微秒级请求转发速度。
 * __静态 IP。__ 支持内部静态 IP，每个 Subnet 一个。
+* 💢 __实例无法通过 NLB 访问自己。__ 网络包可以成功发出，但是因为 NLB 会保留源地址和目标地址，导致两个地址一致，被网卡判断是无效包，从而访问失败。
+  * 由于 ALB 会替换源地址，所以不存在这个问题。
 
 ### Classic Load Balancer
 
@@ -553,6 +555,9 @@ __快速通道 >>>__ [JavaScript API 手册](https://docs.aws.amazon.com/AWSJava
 * __Primary Key 如果包含 sort key，则意味着在 `getItem` 时必须同时提供 partition key 和 sort key。__
   * Primary Key 是确保数据唯一性的依据，而 `getItem` 是取出单条数据，所以必须完整提供两个 key，否则会报「The provided key element does not match the schema」错误。
   * 如果只想按照 partition key 来查询，可以使用 `query`。
+* __DynamoDB 使用特定数据格式。__ 如 `{ id: { 'N': 100 } }`，其中的 `N` 代表数据是数字格式。
+  * 在 SDK 中可使用 `AWS.DynamoDB.Converter.unmarshall()` / `marshall()` 函数在 DynamoDB 格式与原生格式之间做转换。
+* __索引不等于唯一。__ DynamoDB 的索引对唯一性没有要求。
 
 
 ## HyperPlane
@@ -614,7 +619,29 @@ _「托管的 API 网关。」_
 
 ## SQS（Simple Queue Service）
 
+_「托管的极简消息队列。」_
+
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
+
+## AWS SDK
+
+_「用编程方式来调用 AWS 服务接口。」_
+
+### JavaScript
+
+* 💢 __几乎所有服务接口调用均为异步，返回 `AWS.Request` 对象。__
+  * ✅ 可使用 `AWS.Request.promise()` 函数将其转换成 `Promise` 然后使用 `await` 修饰符来转化成同步调用。注意 `await` 仅能在带 `async` 修饰符的函数中使用。
+
+## CodeDeploy
+
+* 💢 __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
+  * 可在 EC2 实例上查看日志，位置是 `/var/log/aws/codedeploy-agent/codedeploy-agent.log`。
+
+
+
+
+
+
 
 
 
