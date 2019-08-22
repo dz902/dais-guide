@@ -351,6 +351,13 @@ _「无服务器计算资源。」_
 * __可以通过 Environment 变量传入参数。__ Function 将可以访问这些参数。
   * 🇨🇳 中国区暂时不支持。
 
+### Layer
+
+* __可以复用的依赖。__ 不用每个函数去打包依赖。
+* __上传 zip 包来创建 Layer。__
+* 💢 __打包有固定格式。__ 不按格式则无法正常引入依赖。（见 [Link](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html)）
+  * 比如 Node.js 的依赖目录必须是 `nodejs/node_modules`。
+
 ### 踩坑
 
 * 🚚 __Log Group 无法在 Stack 删除或回退时自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在 Stack 资源之列，所以不会在 Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
@@ -637,7 +644,9 @@ _「用编程方式来调用 AWS 服务接口。」_
 * 💢 __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
   * 可在 EC2 实例上查看日志，位置是 `/var/log/aws/codedeploy-agent/codedeploy-agent.log`。
 
+## Organizations
 
+* 💢 __被关联的账号无法下载详细的账单报表。__
 
 
 
