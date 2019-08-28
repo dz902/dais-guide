@@ -281,8 +281,9 @@ _「云上的虚拟专属网络。」_
 ### 总览
 
 * __逻辑隔离。__ VPC 之间不互通，除非额外使用 VPC Peering 等专门的对接方式。
-* __IP 地址保留。__ CIDR 的 1 号 IP 地址是默认网关，2 号是 DHCP，3 号预留未来使用，255 号因为不支持 Broadcasting 而做了保留。
-  * 实际上会只有整个 VPC 的 1 号会变成网关，但其他 Subnet 的 1 号也都会保留。
+* __IP 地址保留。__ VPC CIDR 的 1 号 IP 地址是 VPC 路由器（默认网关），2 号是 DNS，3 号预留未来使用，255 号因为不支持 Broadcasting 而做了保留。
+  * 每个 Subnet CIDR 的第 1 个和最后 1 个 IP 地址也会保留，不准使用。
+  * 实际上会只有整个 VPC CIDR 的 2 号会预留做 DNS，但其他 Subnet CIDR 的 2 号也都会保留。
 * __不支持 Broadcasting。__ 暂时也不支持 Multicasting。
 * __不支持监听模式。__ 不支持 Promiscus 模式，避免了包嗅探的问题。
 * __Network ACL 是针对整个 VPC 的无状态端口防火墙。__ 必须设置双向允许，网络包才能双向流动。
@@ -331,6 +332,11 @@ _「云上的虚拟专属网络。」_
 * __用户需自行准备 Customer Gateway 硬件或软件。__ 在 AWS 上「创建 Customer Gateway」指的是「生成 Customer Gateway 对应的配置」。
   * __AWS 提供已经测试过可用的软硬件路由列表。__
 * __Tunnel 1 是主管道，Tunnel 2 是备用管道。__ 见 [Link](https://community.spiceworks.com/how_to/143768-how-to-set-up-a-site-to-site-vpn-for-aws)。
+
+### Amazon DNS Server
+
+* __VPC CIDR 的第 2 个 IP 地址是 AWS 官方提供的 DNS 服务器。__ 也可以使用 `169.254.169.253`，见 [Link](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html)。
+* __官方 DNS 服务器可以解析 `.internal` 私有域名，也可以解析 Route 53 Private Hosted Zone 中的地址。__
 
 
 ## Lambda
