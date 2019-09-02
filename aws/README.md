@@ -322,6 +322,7 @@ _「云上的虚拟专属网络。」_
 * __可保存至 CloudWatch Logs 或 S3 Bucket。__ 并自动创建所需权限。 
   * 🇨🇳 __S3 Bucket 如有原来带有 `aws-cn` 的权限会出错。__ `aws-cn` 中间的 `-` 会被丢掉，导致「MalformedPolicy - Invalid principal in policy」错误。
   * 可以到 CloudTrail 中找到该条 API 调用，将 Bucket Policy 部分复制出来，加上 `-`，手动覆盖原权限。
+* __忘记打开 Flow Logs 但是产生大流量账单时可通过 CloudWatch 简单排查流量大头。__ 使用 NetworkOut 等 Metric。
 
 ### Site-to-Site VPN
 
@@ -522,6 +523,11 @@ _「托管的消息队列。」_
 
 _「托管的 Docker 集群治理工具。」_
 
+### ECS Container Agent
+
+* __EC2 在安装 ECS Container Agent 之后才能接入 ECS 集群。__ ECS 管理的 EC2 实例或 ECS-Optimized 型实例已经自带 ECS Container Agent。
+* __ECS Container Agent 是开源的。__ 见 [Link](https://github.com/aws/amazon-ecs-agent)，目前仅支持 EC2。
+
 ## EKS（Elastic Kubernetes Service）
 
 _「托管的 K8s Master Node。」_
@@ -591,6 +597,13 @@ _「命令行界面。」_
 
 * 🈲 __如果自行 `export AWS_DEFAULT_REGION=xxx` 而 `xxx` 不存在，则后续所有的命令都可能报错。__ 错误信息：`botocore.exceptions.ProfileNotFound: The config profile (xxx) could not be found`。
 
+## Beanstalk（Elastic Beanstalk）
+
+_「编程 PaaS 平台。」_
+
+* __可直接上传代码形成应用。__ 可选择多种编程语言运行环境，以及 Web 和 Worker 两种模板。
+* __支持多种部署方式。__
+
 
 ## API Gateway
 
@@ -636,6 +649,18 @@ _「托管的极简消息队列。」_
 
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
 
+
+## Data Pipeline
+
+* __传输的源和目标称作「Data Node」。__
+
+
+## X-Ray
+
+_「托管的分布式追踪系统。」_
+
+* __Interceptors。__
+
 ## AWS SDK
 
 _「用编程方式来调用 AWS 服务接口。」_
@@ -644,6 +669,10 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 * 💢 __几乎所有服务接口调用均为异步，返回 `AWS.Request` 对象。__
   * ✅ 可使用 `AWS.Request.promise()` 函数将其转换成 `Promise` 然后使用 `await` 修饰符来转化成同步调用。注意 `await` 仅能在带 `async` 修饰符的函数中使用。
+
+## CodeBuild
+
+* 💢 __默认不支持 VPC 内的资源，需要额外的配置。__ 见 [Link](https://docs.aws.amazon.com/codebuild/latest/userguide/vpc-support.html)。
 
 ## CodeDeploy
 
