@@ -257,6 +257,7 @@ _「托管的 4/7 层负载均衡器。」_
 * __每选择 1 个 AZ，即会在这个 AZ 中置入一个 NLB 并附带一个 IP 地址。__ 面向 Internet 的 NLB 可以选择 EIP 或随机分配地址，内部的 NLB 只能随机分配。
   * __NLB 默认只会向自己 AZ 中的目标。__ ✅ 每选择一个 AZ，都应该确保 AZ 中有健康的目标。
   * 💢 __如果某个 NLB 所处的 AZ 中没有目标，而用户正好访问到了这个 NLB，就会导致 NLB 无法访问。__ NLB 依靠 DNS 记录做负载均衡，而客户端可能会缓存这个记录，导致反复访问同一个没有目标的 NLB，导致失败。
+  * __如果想让 NLB 能转发流量到任意 AZ 中的目标，可以开启 Cross-Zone Load Balancing。__
 
 ### Classic Load Balancer
 
@@ -590,6 +591,12 @@ __快速通道 >>>__ [JavaScript API 手册](https://docs.aws.amazon.com/AWSJava
 
 ## KMS（Key Management Service）
 
+### CMK（Customer-Managed Keys）
+
+* __使用 `GenerateDataKey` 命令来返回明文 Key + 密文 Key。__ 明文 Key 用来加密数据，密文 Key 和数据存一起，取出数据时先解密 Key，然后用 Key 解密数据。
+* __使用 `GenerateDataKeyWithoutPlainText` 命令只返回密文 Key。__ 适用于需要延迟一段时间再加密的情况，届时需先解密 Key，然后再加密。
+  * 也可用于权限隔离，比如 A 组件负责存放对应的密文 Key，B 组件负责解密 Key 并用 Key 来加密数据。即 A 组件无需知道密文 Key。
+
 ## CLI（Command Line Interface）
 
 _「命令行界面。」_
@@ -607,8 +614,11 @@ _「编程 PaaS 平台。」_
 
 * __可直接上传代码形成应用。__ 可选择多种编程语言运行环境，以及 Web 和 Worker 两种模板。
 * __支持多种部署方式。__
+  * Canary
+  * Green-Blue
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
+* __使用 `.ebextensions` 文件夹中的 `.config` 文件来定制环境。__ 
 
 ### EB CLI
 
@@ -616,7 +626,7 @@ _「编程 PaaS 平台。」_
 
 ### 踩坑
 
-* __Beanstalk 是一种部署 + 运行时服务。__ 不对接 CodeDeploy，而是直接对接 CodeBuild。
+* __Beanstalk 是一种部署 + 运行时服务。__ 不对接 CodeDeploy，而是直接对接 CodeBuild 的产出物。
   * 在 CodePipeline 里面也以部署服务的形式供选择。
 
 
