@@ -154,9 +154,17 @@ _「功能丰富的对象存储。」_
 
 * __直接对 S3 上存储的半结构化数据进行视图过滤。__ 基于 PartiQL 语言。
 
+### Batch Operations
+
+* __使用 CSV 作为输入来执行批量操作。__ 也可以使用 Inventory Manifest 来执行操作。
+
 ### 数据湖
 
 * __数据湖核心。__ S3 是 AWS 数据湖的核心存储机制，也是数据湖的「湖」本体，大部分分析类服务的持久化存储由 S3 提供。
+
+### 上传
+
+* __单个 `PUT` 最多 5GB。__ 单次 Multipart Upload 最大 5TB。
 
 ### 踩坑
 
@@ -491,9 +499,13 @@ _「云上监控平台。」_
 * __Logs 是日志收集和查看器。__ 有相对独立的 ARN 和 API 名字（logs）。
   * __有 Logs Insights 可以直接对日志进行查询。__ 🇨🇳 中国区暂时没有。
 * __可以把日志转发到 Lambda。__
-  * 🇨🇳 __中国区暂不支持。__
+  * 🇨🇳 中国区暂不支持。
 * __可以把日志转发到 Elasticsearch。__ 仅限 AWS 托管的 Elasticsearch。
-  * 🇨🇳 __中国区暂不支持。__
+  * 🇨🇳 中国区暂不支持。
+
+### Alarms
+
+* __有 OK、INSUFFICIENT_DATA 和 ALARM 三种状态。__
 
 ## CloudTrail
 
@@ -502,6 +514,13 @@ _「官方的 API 访问日志。」_
 ### 总览
 
 * __默认打开。__
+
+### Event
+
+* __区分 Management Event 和 Data Event 类型。__ 
+  * __Management Event 指的是管理类操作。__ 通常指的是配置或权限的修改。
+  * __Data Event 指的是对资源的操作。__ 比如上传文件到 S3。
+  * 💢 __默认不记录 Data Event。__
 
 ## Kinesis
 
@@ -571,8 +590,25 @@ __快速通道 >>>__ [JavaScript API 手册](https://docs.aws.amazon.com/AWSJava
 
 * __从 Amazon.com 购物车需求发展而来。__
   * 有论文。
+* __DynamoDB Accelerator（DAX）指的是内存缓存层。__ 打开 DAX 即可使用内存缓存提升效率。
+* __读写均有体量限制。__ 每单位读 = 4KB/条目/秒，每单位写 = 1KB/条目/秒。
+  * 使用最终一致性读取时，每单位读 = 2 × 4KB/条目/秒。
 
 ### DynamoDB Streams
+
+* __DynamoDB 的时序增删改查事件合集。__
+
+### Capacity Unit
+
+* __分 Read Capacity Unit（RCU）和 Write Capacity Unit（WCU）。__ 时间单位为秒。
+  * 1 RCU = 1 个读取操作，最多 4KB 数据（强一致性）。
+  * 1 WCU = 1 个写入操作，最多 1KB 数据。
+* __RCU 和 WCU 均向上舍入。__ 即不足 1 Unit 的按 1 Unit 计算。
+* __使用「最终一致性」模式读取，则每 RCU 可以支持 2 个读取操作或 8KB 数据。__
+* __使用 `ReadItem` 和 `BatchReadItem`， 每读取一个 Item 即算一个读取操作。__ 即 1.5KB 的 Item 会向上舍入成 4KB，6.5KB 的 Item 会向上舍入到 8KB。
+* __使用 `Query`，每次调用算一个读取操作，按返回数据量计算 RCU。__ 
+* __使用 `Scan`，根据扫描的数据总量来计算 RCU。__
+* __读取不存在的 Item 也会消耗读取操作。__ 和正常的读取一致。
 
 ### 踩坑
 
@@ -618,7 +654,7 @@ _「编程 PaaS 平台。」_
   * Green-Blue
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
-* __使用 `.ebextensions` 文件夹中的 `.config` 文件来定制环境。__ 
+* __使用 `.ebextensions` 文件夹中的 `.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
 
 ### EB CLI
 
@@ -660,6 +696,10 @@ _「托管的 API 网关。」_
   * 在后续再执行函数时会效率会逐步提高到最优，所以为了避免性能损耗，会做 [Pre-warming](https://forums.aws.amazon.com/thread.jspa?threadID=232882)。
 * 💢 __Console 中的「Test」功能偶尔会使用旧代码。__ 修改函数并保存后，点击「Test」，日志现实仍然测试的是旧函数。
 
+### 错误代码
+
+* __`429 Too Many Requests` 用户请求数量超过了限额。__ 默认每秒 10000 次调用。
+
 ### 踩坑
 
 * __路径信息不会自动添加到 Endpoint 上。__ 必须手动在 Endpoint 上添加静态路径，或者用路径参数捕捉后再添加动态路径。
@@ -667,17 +707,35 @@ _「托管的 API 网关。」_
 * __测试 `POST` 方法时将默认使用 `application/json` 格式。__ 不是 Web 常见的 `application/x-www-form-urlencoded` 格式。
   * 可在 Method Execution 界面手动添加 `Content-Type: application/x-www-form-urlencoded` 的 header 来覆盖。
 
-
 ## SQS（Simple Queue Service）
 
 _「托管的极简消息队列。」_
 
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
-
+* 💢 __消息处理完后不会自动删除。__ 必须手动删除。
+  * __设置队列的 VisibilityTimeout 可以确保在初次返回消息之后一段时间内该消息不会再被返回，避免重复处理。__ 默认 30 秒，最短 0 秒，最长 12 小时。
+* __设置对列的 DelaySeconds 参数，可以让消息延迟返回。__ 默认 0 秒，最长 15 分钟。
+  * 也可在单条消息上设置 message timer 参数来覆盖 DelaySeconds 参数。
 
 ## Data Pipeline
 
 * __传输的源和目标称作「Data Node」。__
+
+## System Manager
+
+_「系统管理工具集。」_
+
+### Parameter Store
+
+* __安全地存储密码等机密信息。__ 免费存储 10000 条，无额外费用。
+
+## Secret Manager
+
+_「秘密管理工具。」_
+
+* __安全存储数据库密码等秘密信息。__
+* __可自动轮换密码。__ 与 RDS 自动集成。
+* 🇨🇳 __中国区暂时没有。__
 
 ## Glue
 
@@ -707,6 +765,15 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 ## CodeDeploy
 
+### 部署方式
+
+* __All-at-once = 全部机器同时部署。__ 服务会中断。
+* __Rolling = 每次部署 n 台，完成后继续部署 n 台。__ 算力 = 总量减去 n 台。
+* __Rolling with additional batch = 额外开 n 台机器进行部署，完成后继续部署 n 台。__ 算力在部署期间不变。
+* __Immutable = 额外开一个 Auto Scaling 组，并完整复制整个应用。__ 算力在部署期间 × 2。
+
+* 💢 __默认的回滚方式是重新部署。__ 对于蓝绿部署来说，可以手动做环境 URL 切换。
+* 💢 __必须安装 Agent。__ 否则无法部署。
 * 💢 __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
   * 可在 EC2 实例上查看日志，位置是 `/var/log/aws/codedeploy-agent/codedeploy-agent.log`。
 
@@ -714,10 +781,25 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 * 💢 __被关联的账号无法下载详细的账单报表。__
 
+## STS（Simple Token Service）
+
+_「登录令牌发放服务。」_
+
+### `AssumeRoleWithWebIdentity`
+
+* __先登录 Facebook 并拿到 OAuth 2 令牌，然后用令牌来调用 `AssumeRoleWithWebIdentity`。__
+
+### `DecodeAuthorizationMessage`
+
+* __用户执行未授权操作时，AWS 服务会返回 `403 Unauthorized` 并附加一条加密的信息。__ 这条信息可以用 `DecodeAuthorizationMessage` 来解密。
 
 
+## SNS（Simple Notification Service）
 
+_「消息推送服务。」_
 
+* __系统推送支持 Lambda、SQS、EventBridge 和 HTTP/S Endpoint。__
+* __用户推送支持 Mobile Push 和短信。__
 
 
 
