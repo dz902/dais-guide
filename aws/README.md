@@ -11,17 +11,17 @@
 * 🇨🇳 = 宁夏和北京 Region（中国大陆 Region，下简称「中国区」）相关
 * 🚚 = 在 CFn / CDK 中的情况
 * 🚥 = 在 CLI 工具中的情况
+* 👀 = 在 CloudWatch Metrics 中的情况
 * ✅ = 建议执行的操作
 * 🈲 = 不建议执行的操作
 * 💢 = 需要注意的坑
 * 💰 = 会产生额外费用
 
-## 目录
-
-
 ## 🇨🇳 中国区特有情况
 
 _「部分情况也适用于 GovCloud。」_
+
+> [服务](https://www.amazonaws.cn/en/about-aws/regional-product-services/) | [案例](https://aws.amazon.com/cn/solutions/case-studies/china/)
 
 ### 使用限制
 
@@ -35,6 +35,8 @@ _「部分情况也适用于 GovCloud。」_
 * 💢 __资源不互通。__ ARN 中的第二段由「aws」改为「aws-cn」，与 Global 资源不在一个体系。
 
 ### Service Endpoint / Principal 差异
+
+* 💢 __中国区的服务命名与 Global 其他 Region 有些许差异。__ 请查看 [AWS Service Endpoints](https://docs.amazonaws.cn/en_us/general/latest/gr/rande.html) 来确定具体名字。
 
 ## 安全
 
@@ -102,6 +104,10 @@ _「云上的访问权限管理体系。」_
   * 跨账号使用 Role 时，会先将 Role 授权给目标账号，然后由目标账号再自己授权给单个 IAM User。
   * 权限名称为 `sts:AssumeRole`，因为担任 Role 实际上是 AWS Simple Token Service 出具了一个临时 Token 来给访问请求签名。
 
+### Policy
+
+* 🚥 __使用 `simulate-custom-policy` 可以模拟该 Policy 的效果。__ 见 [Link](https://docs.aws.amazon.com/cli/latest/reference/iam/simulate-custom-policy.html)。
+
 ### MFA（Multi-Factor Authentication）
 
 * ✅ __多因子认证要求用户在登录使用额外的一次性密码。__ 推荐使用，至少应该在 Root Account 或管理员账号上启用。
@@ -122,6 +128,9 @@ _「功能丰富的对象存储。」_
 
 * __S3 是 Global 服务，但 Bucket 有区域之分。__ 区域选择会影响访问速度。
   * 🇨🇳 中国区除外。中国区的 S3 无法看到 Global 的 Bucket。
+* __必须使用 Region-specific Endpoint（`bucket-name.s3.region-name.amazonaws.com`）来访问。
+  * 如果不使用正确的 Endpoint，2019 年 3 月之前建立的桶将会收到 `307 Permanently Moved` 以及正确的 Endpoint。
+  * 2019 年 3 月后建立的桶将不支持不带 `region-name` 的 Endpoint，并直接返回 `400 Bad Request` 错误。
 * __不同区域的 Bucket 可以通过 Cross-Region Replication（CRR）自动同步。__  
   * 🇨🇳 __CRR 不支持同步出、入中国区。__ 中国区的 CRR 仅能在中国区 Region 之间进行，Global Region 的 CRR 无法同步至中国区。
 
@@ -156,20 +165,27 @@ _「功能丰富的对象存储。」_
 
 ### Batch Operations
 
+> [手册](https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html)
+
 * __使用 CSV 作为输入来执行批量操作。__ 也可以使用 Inventory Manifest 来执行操作。
+
+
+### 上传
+
+* __使用 `PUT` 可上传最大 5GB 的文件。__ 使用 Multipart Upload 可上传最大 5TB 的文件。
+* __Multipart Upload 支持文件块串行、并行上传。__ ✅ 网络不好时可以降低上传失败风险，网络好时可以最大限度利用带宽。
+* 💢 __尚未完成的 Multipart Upload 文件块不会自动删除，但是会占用空间并产生费用。__ 可使用 Bucket Lifecycle Policy 删除一定天数后仍未完成的文件块，见 [Link](https://docs.aws.amazon.com/AmazonS3/latest/dev/mpuoverview.html#mpuploadpricing)。
 
 ### 数据湖
 
 * __数据湖核心。__ S3 是 AWS 数据湖的核心存储机制，也是数据湖的「湖」本体，大部分分析类服务的持久化存储由 S3 提供。
 
-### 上传
-
-* __单个 `PUT` 最多 5GB。__ 单次 Multipart Upload 最大 5TB。
-
 ### 踩坑
 
-  * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
-  * 🚥 __无法从 CLI 获得 ARN。__ S3 的 CLI 没有提供任何获得 ARN 的方法，用户只能从 Console 复制，或者自己组成 ARN，需考虑中国区或 GovCloud 的名称差异问题。
+* 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
+* 🚥 __无法从 CLI 获得 ARN。__ S3 的 CLI 没有提供任何获得 ARN 的方法，用户只能从 Console 复制，或者自己组成 ARN，需考虑中国区或 GovCloud 的名称差异问题。
+* 👀 __`BucketSizeBytes` 和 `NumberOfObject` 的数字包括所有版本以及暂时未完成的 Multipart Upload 文件块。__ 即这些 CloudWatch Metrics 体现的数字会大于 S3 Console 中体现的数字，见 [Link](https://docs.aws.amazon.com/AmazonS3/latest/dev/cloudwatch-monitoring.html)。
+* __`PUT` 操作既用于上传文件，又用于修改现有文件的属性。__ 见 [Link](https://docs.aws.amazon.com/cli/latest/reference/s3api/put-object.html)。
 
 
 ## Athena
@@ -356,6 +372,8 @@ _「云上的虚拟专属网络。」_
 
 _「无服务器计算资源。」_
 
+> [文档](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) | [价格](https://www.amazonaws.cn/en/lambda/pricing/) | [FAQ](https://www.amazonaws.cn/en/lambda/faqs/)
+
 ### 概况
 
 * __采用 Firecracker Micro-VM 内核。__
@@ -377,6 +395,18 @@ _「无服务器计算资源。」_
 * 💢 __打包有固定格式。__ 不按格式则无法正常引入依赖。（见 [Link](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html)）
   * 比如 Node.js 的依赖目录必须是 `nodejs/node_modules`。
 
+### 异步调用
+
+* __支持异步调用。__ 实际上是 Lambda 自己管理了一个事件队列来做异步调用。
+  * 💢 __用户无法获取异步调用的函数的返回值。__ 暂时[没有相关API](https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html)。
+  * 💢 __Lambda 异步调用与编程语言自己的 `async` 行为是两个完全不同的东西。__ 后者仍然可以是同步调用，Lambda 会等待函数所有异步执行完毕后再返回。
+* __异步调用的函数返回错误时会重试 2 次。__ 分别间隔 1、2 分钟。
+  * 如果均失败则会尝试把事件[发送至 Dead Letter Queue](https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq)，如果有设置。
+  * 如果因为触及并行限额而被限流，事件会被放回到队列中[在 6 小时内自动重试](https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html#dlq)。
+* 💢 __异步调用的队列是最终一致的。__ 即同样的事件可能被发送两次，也可能因为函数处理不及而事件已经过期所以还没发送给函数就被删掉。
+  * ✅ 函数应该能很好地处理重复事件。
+  * ✅ 应该配置 Dead Letter Queue 来避免事件丢失。
+
 ### 踩坑
 
 * 🚚 __Log Group 无法在 Stack 删除或回退时自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在 Stack 资源之列，所以不会在 Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
@@ -390,7 +420,7 @@ _「无服务器计算资源。」_
 
 _「托管的 Elasticsearch + Kibana 应用。」_
 
-__快速通道__ >> [使用手册](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/what-is-amazon-elasticsearch-service.html)
+> [手册](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/what-is-amazon-elasticsearch-service.html)
 
 ### 概况
 
@@ -408,6 +438,14 @@ __快速通道__ >> [使用手册](https://docs.aws.amazon.com/elasticsearch-ser
 
 _「基建即代码工具。」_
 
+> [手册](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html) | [资源](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/AWS_EC2.html) | [CLI](https://docs.aws.amazon.com/cli/latest/reference/cloudformation/index.html#cli-aws-cloudformation)
+
+* __Template 必须上传到 S3 桶中。__ 选择本地文件[也会自动上传到 S3](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-whatis-howdoesitwork.html)。
+
+### CLI
+
+* __`package` 命令可以上传 Assets 到 S3 桶，并自动将 Template 中指向本地文件的部分修改为指向 S3 的地址。__
+
 ### 踩坑
 
 * __循环权限依赖。__ 通常发生在具备 Resource-Base Policy 的资源上，资源需要知道角色的 ARN 才能开放权限，而角色则需要知道资源的 ARN 才能设置权限，导致循环依赖。 解决办法如下。
@@ -422,7 +460,7 @@ _「基建即代码工具。」_
 
 _「封装成程序代码的 CFn。」_
 
-__快速通道__ >> [API 文档](https://docs.aws.amazon.com/cdk/api/latest/versions.html)
+> [API](https://docs.aws.amazon.com/cdk/api/latest/versions.html)
 
 ### 总览
 
@@ -445,7 +483,7 @@ __快速通道__ >> [API 文档](https://docs.aws.amazon.com/cdk/api/latest/vers
 
 ### 踩坑
 
-* 🇨🇳 __`cdk bootstrap` 中使用的 CFn 返回 Bucket 的 Global URL，导致不可创建 ChangeSet。__ CFn 中的返回值为 `DomainName` 而不是 `RegionalDomainName`，而中国区不支持 Global Endpoint，导致错误。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
+* 🇨🇳 __`cdk bootstrap` 中使用的 CFn 返回 Bucket 的 Endpoint 错误，导致不可创建 ChangeSet。__ CFn 中的返回值为 `DomainName` 而不是 `RegionalDomainName`，而中国区的 CloudFormation 无法返回正确 Endpoint，导致错误。解决办法如下。（版本：v1.2.0，见 [#1459](https://github.com/aws/aws-cdk/issues/1459)）
   * 修改 `node_modules/aws-cdk/lib/api/bootstrap-environment.js` 中的 `"StagingBucket", "DomainName"` 为 `"StagingBucket", "RegionalDomainName"`。
 * 🇨🇳 __中国区 Service Principal / ARN 格式错误。__ Global 区域研发者对中国区命名规则误判，写错规则，导致 CDK 基本无法使用。（见 [Link](https://github.com/aws/aws-cdk/issues/2198)）
   * 可调用内部接口自行覆盖内置规则临时解决。（见 [Link](https://gist.github.com/bnusunny/090e65be682b4703b72b41e4f648c51c)）
@@ -528,6 +566,14 @@ _「托管的消息队列。」_
 
 ### Data Streams
 
+> [手册](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) | [限制](https://docs.amazonaws.cn/en_us/streams/latest/dev/service-sizes-and-limits.html) | [价格](https://www.amazonaws.cn/en/kinesis/data-streams/pricing/) | [FAQ](https://www.amazonaws.cn/en/kinesis/data-streams/faqs/)
+
+* __消息会按 Parition Key 被送到不同的 Shard。__ 每个 Shard 提供每秒 1MB 输入，2MB 输出，1000 次 `PUT`。
+* 💢 __默认按收取时间来为消息排序，[不确保精准](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecord.html)。__ 如需精准排序，需在消息发送时手动提供 `SequenceNumberForOrdering` 参数，消息会按此参数从小到大排序。
+  * 如不提供，Sequence Number 会自增并保持唯一。
+* 💢 __排序仅针对单个 Shard。__ Sequence Number 也[仅在单个 Shard 内唯一](https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html)。
+* 💢 __消息不能手动删除。__ 只能等自动过期。
+  * 在取数据时[提供 Sequence Number](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html) 来确保只取 Sequence Number 之后的新消息。
 * 💢 __传递延迟较高。__ 目前仅支持亚秒级的传递延迟（200-1000ms）。（见 [Link](https://aws.amazon.com/about-aws/whats-new/2015/03/amazon-kinesis-propagation-delay-reduction/)、[Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
   * 如需最大限度降低延迟，还应在客户端处降低轮询间隔。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/kinesis-low-latency.html)）
   * 使用 Enhanced Fan-Out 推送机制可以降低到约 75ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
@@ -586,7 +632,7 @@ _「云的 7 层防火墙。」_
 
 _「托管的云原生 NoSQL 数据库。」_
 
-__快速通道 >>>__ [JavaScript API 手册](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html)
+> [API](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html)
 
 * __从 Amazon.com 购物车需求发展而来。__
   * 有论文。
@@ -686,6 +732,10 @@ _「托管的 API 网关。」_
 * __不能使用 `/res/{proxy+}` 的形式。__ 因为资源路径只允许纯参数或者纯静态，不允许混杂二者。
   * 可先创建 `/res` 然后在其之下创建 `/{proxy+}`。
 
+### Model
+
+* __用于指示 Request 和 Response 的格式。__
+
 ### Lambda
 
 * __Lambda Proxy 打开之后路径和请求中的参数可以从 `event` 中读取。__ 分别是 `event.pathParameters` 和 `event.queryStringParameters`。
@@ -711,11 +761,15 @@ _「托管的 API 网关。」_
 
 _「托管的极简消息队列。」_
 
+> [FAQ](https://amazonaws-china.com/sqs/faqs/)
+
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
 * 💢 __消息处理完后不会自动删除。__ 必须手动删除。
   * __设置队列的 VisibilityTimeout 可以确保在初次返回消息之后一段时间内该消息不会再被返回，避免重复处理。__ 默认 30 秒，最短 0 秒，最长 12 小时。
 * __设置对列的 DelaySeconds 参数，可以让消息延迟返回。__ 默认 0 秒，最长 15 分钟。
   * 也可在单条消息上设置 message timer 参数来覆盖 DelaySeconds 参数。
+
+### FIFO Queue
 
 ## Data Pipeline
 
@@ -800,6 +854,19 @@ _「消息推送服务。」_
 
 * __系统推送支持 Lambda、SQS、EventBridge 和 HTTP/S Endpoint。__
 * __用户推送支持 Mobile Push 和短信。__
+
+### Topic
+
+* __用户必须先订阅 Topic 才能收到消息。__ 消息会推送给所有订阅者。
+
+### Filter
+
+* __可以为每个订阅者添加 Filter 来过滤消息。__ 比创建多个 Topic 更高效。
+
+### Fanout Pattern
+
+* ✅ __用一个消息队列（如 SQS）来解耦发布者和订阅者。__ 订阅者订阅消息队列，而不直接订阅 Topic。
+  * 牺牲部分实时性，换取并行处理、弹性伸缩等好处。
 
 
 
