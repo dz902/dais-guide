@@ -247,6 +247,12 @@ _「云上虚拟机。」_
 ### SSH
 
 * __SSH 卡死时请使用 `~` 大法。__ 先按 `Enter`，然后按 `~`，然后按 `.`，即可强制终止 SSH。
+* __不同系统的默认 SSH 用户名不同。__ Amazon Linux 系列是 `ec2-user`，CentOS 是 `centos`，也有一些是 `root`。
+
+### Instance Metadata
+
+* __在实例上通过 `http://169.254.169.254/latest/meta-data/` 可以获得 Instance Metadata。__ 包括 AMI-ID、IP 地址、MAC 地址等等。
+  * 此项功能由 EC2 提供，无论实例上运行的是哪种系统都可以获取。
 
 ## EBS（Elastic Block Storage）
 
@@ -544,6 +550,10 @@ _「云上监控平台。」_
 ### Alarms
 
 * __有 OK、INSUFFICIENT_DATA 和 ALARM 三种状态。__
+* __有 Period、Evaluation Period 和 Datapoints to Alarm 三个参数。__
+  * Period = 隔多少时间收集一次数据。
+  * Evalution Period = 统计最近几次的数据。
+  * Datapoints to Alarm = 统计结果要超标多少次才触发警报。
 
 ## CloudTrail
 
