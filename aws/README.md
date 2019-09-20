@@ -71,6 +71,8 @@ _「全球基建，高速互联，同城容灾。」_
 
 _「云上的访问权限管理体系。」_
 
+> [手册](https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html)
+
 ### 概况
 
 * __Identity-Based Policy（IBP）是附在用户、角色身上的访问权限。__ 如果没有 IBP 用户无法访问资源。
@@ -112,9 +114,17 @@ _「云上的访问权限管理体系。」_
 
 * ✅ __多因子认证要求用户在登录使用额外的一次性密码。__ 推荐使用，至少应该在 Root Account 或管理员账号上启用。
 
+### 测试 Policy
+
+* __使用 [`SimulateCustomPolicy`](https://docs.aws.amazon.com/cli/latest/reference/iam/simulate-custom-policy.html) 命令可以测试 Policy。__
+* __需要提供 Context Keys。__ 比如 IP 地址、日期。
+  * 为在 `Condition` 中的判断条件提供测试值。
+
 ## S3（Simple Storage Service）
 
 _「功能丰富的对象存储。」_
+
+> [手册](https://docs.aws.amazon.com/AmazonS3/latest/dev/Welcome.html) | [CLI](https://docs.aws.amazon.com/cli/latest/reference/s3/index.html) | [FAQ](https://www.amazonaws.cn/en/s3/faqs/) | [价格](https://www.amazonaws.cn/en/s3/pricing/)
 
 ### 概况
 
@@ -507,6 +517,13 @@ _「托管的 GraphQL。」_
 
 ## RDS（Relational Database Service）
 
+_「托管的关系型数据库。」_
+
+* __支持 Multi-AZ。__ 高可用副本，实时同步。
+  * 可读写。
+  * 平时不启用，当主实例失效时自动启用并更新域名指向。
+* __支持 Read Replica。__ 只读副本，非实时同步。
+
 ## Aurora（RDS Aurora）
 
 _「托管的云原生数据库。」_
@@ -591,9 +608,14 @@ _「托管的消息队列。」_
 
 ### Data Firehose
 
+> [手册](https://docs.aws.amazon.com/firehose/latest/dev/what-is-this-service.html)
+
 * __输送数据专用。__ 消息队列常会充当传输数据时的缓存，所以专门提供了这个功能。
   * 支持往 S3、Lambda、Elasticsearch 等目标位置输送数据。
 * __支持数据转换。__ 输送数据之前可以用 Lambda 进行格式转换。
+* __[支持 SSE 静态加密](https://docs.aws.amazon.com/firehose/latest/dev/encryption.html)。__
+  * __数据源是 Kinesis Data Stream 时 Firehose 不存储数据到硬盘。__ 加密由 Kinesis Data Stream 执行，解密传输到 Firehose 缓存入内存，然后直接存至目标。
+  * __数据源是 `PUT` 时，可以使用 `StartDeliveryStreamEncryption` 打开 Firehose 的 SSE 加密功能。
 
 ### Video Streams
 
@@ -620,6 +642,8 @@ _「托管的 K8s Master Node。」_
 ## EMR（Elastic MapReduce）
 
 _「托管的 Hadoop 生态。」_
+
+> [价格](https://www.amazonaws.cn/en/elasticmapreduce/pricing/)
 
 ## SageMaker
 
@@ -683,6 +707,10 @@ _「托管的云原生 NoSQL 数据库。」_
 
 ## KMS（Key Management Service）
 
+_「托管的密钥管理服务。」_
+
+> [手册](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) | [FAQ](https://www.amazonaws.cn/en/kms/faqs/) | [价格](https://www.amazonaws.cn/en/kms/pricing/)
+
 ### CMK（Customer-Managed Keys）
 
 * __使用 `GenerateDataKey` 命令来返回明文 Key + 密文 Key。__ 明文 Key 用来加密数据，密文 Key 和数据存一起，取出数据时先解密 Key，然后用 Key 解密数据。
@@ -710,7 +738,7 @@ _「编程 PaaS 平台。」_
   * Green-Blue
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
-* __使用 `.ebextensions` 文件夹中的 `.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
+* __使用 `.ebextensions` 文件夹中的 `*.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
 
 ### EB CLI
 
@@ -729,10 +757,11 @@ _「托管的 API 网关。」_
 * __Edge-Optimized Endpoint 就是 API Gateway + CloudFront，使用全局统一的域名。__ Regional Endpoint 需要你按需自行配置 CloudFront。
   * 🇨🇳 中国区暂时没有 Edge-Optimized Endpoint。
   * 💢 如使用 Edge-Optimized Endpoint，由于使用了全局统一域名并仅路由到单个 Region 的 API Gateway，所以无法做双活容错、基于延迟的 DNS 路由等等。要达到这个效果可使用多个 Regional Endpoint。（见 [Link](https://aws.amazon.com/blogs/compute/building-a-multi-region-serverless-application-with-amazon-api-gateway-and-aws-lambda/)）
+* __可以直接设置为 AWS 服务代理。__ 直接[集成 AWS 服务](https://amazonaws-china.com/blogs/compute/using-amazon-api-gateway-as-a-proxy-for-dynamodb/)。
 
 ### API 配置
 
-* __API 设置好之后需要部署才能使用。__ 旧版 API 可以和新版并存。
+* 💢 __API 设置好之后需要部署才能使用。__ 旧版 API 可以和新版并存。
 * __API 部署后会在 URI 后加入部署的 Stage 名作为路径。__ 可以通过自定义域名来避免。
 * __原来不支持把后台服务放到私有子网中。__ 现在可以通过 PrivateLink 以及 NLB 来支持。
 * __使用代理模式时可使用 `{proxy+}` 作为路径参数。__ 这是一个贪婪式参数，会尽量多地匹配所有路径上的字符，并存入 `{proxy}` 这个参数中。
@@ -750,11 +779,11 @@ _「托管的 API 网关。」_
 
 * __Lambda Proxy 打开之后路径和请求中的参数可以从 `event` 中读取。__ 分别是 `event.pathParameters` 和 `event.queryStringParameters`。
 * __Console 中的设置变更有诸多 bug。__ 建议更改 Proxy 和 Execution Role 等设置的时候采取删除 Method 重建的方式。
-* 💢 __使用 Lambda Proxy 集成的 API 在返回值不符合格式要求时会产生 `502 Bad Gateway` 错误。__ 见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=246541)。
-  * 请仔细检查 `status` 和 `body`，尤其是 `body` 是否已经 `JSON.stringify()`。
-* 💢 __默认的超时只有 3s。__ 函数在初次执行时可能会超时。
+* __使用 Lambda Proxy 集成的 API 在返回值不符合格式要求时会产生 `502 Bad Gateway` 错误。__ 见 [Link](https://forums.aws.amazon.com/thread.jspa?threadID=246541)。
+  * ✅ 请仔细检查 `status` 和 `body`，尤其是 `body` 是否已经 `JSON.stringify()`。
+* __默认的超时只有 3s。__ 函数在初次执行时可能会超时。
   * 在后续再执行函数时会效率会逐步提高到最优，所以为了避免性能损耗，会做 [Pre-warming](https://forums.aws.amazon.com/thread.jspa?threadID=232882)。
-* 💢 __Console 中的「Test」功能偶尔会使用旧代码。__ 修改函数并保存后，点击「Test」，日志现实仍然测试的是旧函数。
+* __Console 中的「Test」功能偶尔会使用旧代码。__ 修改函数并保存后，点击「Test」，日志现实仍然测试的是旧函数。
 
 ### 错误代码
 
@@ -767,17 +796,26 @@ _「托管的 API 网关。」_
 * __测试 `POST` 方法时将默认使用 `application/json` 格式。__ 不是 Web 常见的 `application/x-www-form-urlencoded` 格式。
   * 可在 Method Execution 界面手动添加 `Content-Type: application/x-www-form-urlencoded` 的 header 来覆盖。
 
+
 ## SQS（Simple Queue Service）
 
 _「托管的极简消息队列。」_
 
-> [FAQ](https://amazonaws-china.com/sqs/faqs/)
+> [手册](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/welcome.html) | [FAQ](https://amazonaws-china.com/sqs/faqs/)
 
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
 * 💢 __消息处理完后不会自动删除。__ 必须手动删除。
-  * __设置队列的 VisibilityTimeout 可以确保在初次返回消息之后一段时间内该消息不会再被返回，避免重复处理。__ 默认 30 秒，最短 0 秒，最长 12 小时。
+  * __设置队列的 VisibilityTimeout 可以确保在初次返回消息之后一段时间内该消息不会再被返回，避免被不同客户端重复处理。__ 默认 30 秒，最短 0 秒，最长 12 小时。
 * __设置对列的 DelaySeconds 参数，可以让消息延迟返回。__ 默认 0 秒，最长 15 分钟。
   * 也可在单条消息上设置 message timer 参数来覆盖 DelaySeconds 参数。
+
+### [Short / Long Polling](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html#sqs-long-polling)
+
+* __使用 `ReceiveMessage` 来获取消息。__ 有 Short 和 Long 两种轮询模式。
+* __默认使用 Short Polling 模式。__ 在 SQS 集群上随机取样并返回消息。
+  * 💢 __可能无法一次取回完整的待处理消息。__ 需要多次调用才能取到完整消息。
+* __可在使用 `ReceiveMessage` 时设置 `WaitTimeSeconds > 0` 则使用 Long Polling 模式。__ 可以避免反复轮询又取不完数据造成的浪费。
+  * __一旦有新的信息会立刻返回。__
 
 ### FIFO Queue
 
@@ -849,6 +887,10 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 _「登录令牌发放服务。」_
 
+### `AssumeRole`
+
+* __返回 AK/SK 以及 Session Token。__ 调用 API 时需要同时提供。
+
 ### `AssumeRoleWithWebIdentity`
 
 * __先登录 Facebook 并拿到 OAuth 2 令牌，然后用令牌来调用 `AssumeRoleWithWebIdentity`。__
@@ -856,6 +898,14 @@ _「登录令牌发放服务。」_
 ### `DecodeAuthorizationMessage`
 
 * __用户执行未授权操作时，AWS 服务会返回 `403 Unauthorized` 并附加一条加密的信息。__ 这条信息可以用 `DecodeAuthorizationMessage` 来解密。
+
+## CloudFront
+
+_「CDN 服务。」_
+
+> [价格](https://www.amazonaws.cn/en/cloudfront/pricing/)
+
+* __免费支持 Server Name Indication（SNI）。__ 如果[使用专属 IP 的 SSL 证书](https://docs.amazonaws.cn/en_us/AmazonCloudFront/latest/DeveloperGuide/cnames-https-dedicated-ip-or-sni.html)（Dedicated IP SSL Certificate），会产生费用。
 
 
 ## SNS（Simple Notification Service）
@@ -878,5 +928,18 @@ _「消息推送服务。」_
 * ✅ __用一个消息队列（如 SQS）来解耦发布者和订阅者。__ 订阅者订阅消息队列，而不直接订阅 Topic。
   * 牺牲部分实时性，换取并行处理、弹性伸缩等好处。
 
+## Cognito
+
+_「托管的 Facebook、Google、Amazon 用户身份服务。」_
+
+> [手册](https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html)
+
+* __🇨🇳 中国区暂时没有。__
+* __支持 MFA。__
 
 
+## CodePipeline
+
+> [手册](https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html)
+
+* __🇨🇳 中国区暂时没有。__
