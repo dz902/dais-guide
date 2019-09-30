@@ -154,9 +154,12 @@ _「功能丰富的对象存储。」_
   * __ACL 也支持「已登录用户」、「所有人」以及「日志组」几个分组。__ 不建议使用。
   * __ACL 中的「所有人」指的是全世界。__ 即全天下的人都可以访问。
 * __非 Bucket 拥有者需要在桶上设置 RBP 并持有对应的 IBP 才能访问。__ 除非在 ACL 里面专门允许。
-* __有「Block Public Access」的设置。__ 针对 Bucket 的设置。✅ 建议打开。
+* __有「Block Public Access」的设置。__ 针对 Bucket 的设置。
+  * ✅ 强烈建议打开。
   * 防止新上传对象公开访问，开启后会抛弃新上传对象的公开访问权限。
   * 防止所有对象公开访问，开启后会忽略对象所附着的公开访问权限。
+  * 💢 __需要特别注意该选项仅会阻止完全公开的 Bucket Policy。__ 一旦加上 `Condition` 语句，即便是非常公开的条件语句，也不会被阻止。
+  * 💢 __比如 `aws:SourceIp: 52.0.0.0/*` 等极其宽泛的 Bucket Policy 也不会被阻止。__
 
 ### Endpoint
 
@@ -368,6 +371,10 @@ _「云上的虚拟专属网络。」_
   * 可以到 CloudTrail 中找到该条 API 调用，将 Bucket Policy 部分复制出来，加上 `-`，手动覆盖原权限。
 * __忘记打开 Flow Logs 但是产生大流量账单时可通过 CloudWatch 简单排查流量大头。__ 使用 NetworkOut 等 Metric。
 
+### Traffic Miroring
+
+* __在不安装 agent 的情况下将一台虚机的进出口流量镜像到另一台虚机上。__ 用于调试和监控。
+
 ### Site-to-Site VPN
 
 * __AWS 提供托管 VPN 方案打通多个隔离网络。__
@@ -549,6 +556,9 @@ _「云上监控平台。」_
 ### 总览
 
 * __Metrics 是应用指标。__
+* __Dashboard 不分地区。__
+* __自定义 Metric 支持 [High-Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics)。__ 默认数据收集频率 1 分钟 1 次，High-Resolution 数据收集频率为 1 秒钟 1 次。
+  * __区别于 EC2 [Detail Monitoring](https://docs.amazonaws.cn/en_us/AWSEC2/latest/UserGuide/using-cloudwatch.html)。__ EC2 服务每 5 分钟发送一次实例指标给 CloudWatch，开启 Detailed Monitoring 之后每 1 分钟发送一次。
 
 ### Events（CloudWatch Events）
 
@@ -571,6 +581,7 @@ _「云上监控平台。」_
   * Period = 隔多少时间收集一次数据。
   * Evalution Period = 统计最近几次的数据。
   * Datapoints to Alarm = 统计结果要超标多少次才触发警报。
+* __Regular Alarm，Period = 60 秒。__ High-Resolution Alarm，Period = 10 / 30 秒。
 
 ## CloudTrail
 
@@ -739,10 +750,19 @@ _「编程 PaaS 平台。」_
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
 * __使用 `.ebextensions` 文件夹中的 `*.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
+* __使用 [Saved Configuration](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-configuration-savedconfig.html) 可以将当前配置存为 `.yml` 文件。__ 可以用于创建多个类似的环境，比如 DEV / PROD。
+  * 默认存放在 Beanstalk 创建的 S3 桶中。
 
 ### EB CLI
 
 * __Beanstalk 提供类似 `npm` 的工具。__
+
+### 部署模式
+
+* __Rolling Updates = 逐台更新。__
+* __Rolling with Additional Batch = 创建 n 台新机器更新。__ 健康检查成功后关掉 n 台旧机器，如此往复直到全部更新完毕。
+* __Immutable Updates = 开一个新的 ASG 然后开新机器。__ 全部健康检查通过后，机器转移到原来的 ASG，删掉空的 ASG，停掉旧机器。
+* __[Blue/Green Deployment](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html) = 创建新环境并部署到新机器。__ 成功后切换 CNAME 到新的环境。
 
 ### 踩坑
 
@@ -758,6 +778,10 @@ _「托管的 API 网关。」_
   * 🇨🇳 中国区暂时没有 Edge-Optimized Endpoint。
   * 💢 如使用 Edge-Optimized Endpoint，由于使用了全局统一域名并仅路由到单个 Region 的 API Gateway，所以无法做双活容错、基于延迟的 DNS 路由等等。要达到这个效果可使用多个 Regional Endpoint。（见 [Link](https://aws.amazon.com/blogs/compute/building-a-multi-region-serverless-application-with-amazon-api-gateway-and-aws-lambda/)）
 * __可以直接设置为 AWS 服务代理。__ 直接[集成 AWS 服务](https://amazonaws-china.com/blogs/compute/using-amazon-api-gateway-as-a-proxy-for-dynamodb/)。
+
+### Method & Integration
+
+* __Method Request / Response。__ Method 是与前端对接的部分，比如 `GET` / `POST`。
 
 ### API 配置
 
@@ -784,6 +808,19 @@ _「托管的 API 网关。」_
 * __默认的超时只有 3s。__ 函数在初次执行时可能会超时。
   * 在后续再执行函数时会效率会逐步提高到最优，所以为了避免性能损耗，会做 [Pre-warming](https://forums.aws.amazon.com/thread.jspa?threadID=232882)。
 * __Console 中的「Test」功能偶尔会使用旧代码。__ 修改函数并保存后，点击「Test」，日志现实仍然测试的是旧函数。
+
+### Stage
+
+* __Stage 用于区分同一套 API 的不同上下文环境。__ 比如 DEV / PROD。
+* __Stage 名字会出现在 URI 中。__ 比如 `https://1x2x3x4x.execute-api.cn-northwest-1.amazonaws.com.cn/dev` 中的 `dev`。
+* __可使用 Stage Variable 来存储变量。__ 可以在 URI 中使用这些变量，以便根据 Stage 来做一些简单的定制。
+
+#### Canary Release
+
+* __在 Stage 上可以开启 Canary Release。__ 
+  * 开启后部署会先到 Canary Release。
+  * 可设定固定百分比的流量指向 Canary Release。
+  * 需手动 Promote Canary Release 才能真正部署到 Stage。
 
 ### 错误代码
 
@@ -863,6 +900,7 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 ## CodeBuild
 
+* __支持「Build 命令」、「项目配置」、「`buildspec.yml`」三个地方设置环境变量。__ [优先顺序](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html)：Build 命令 > 项目配置 > `buildspec.yml`。
 * 💢 __默认不支持 VPC 内的资源，需要额外的配置。__ 见 [Link](https://docs.aws.amazon.com/codebuild/latest/userguide/vpc-support.html)。
 
 ## CodeDeploy
@@ -943,3 +981,18 @@ _「托管的 Facebook、Google、Amazon 用户身份服务。」_
 > [手册](https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html)
 
 * __🇨🇳 中国区暂时没有。__
+
+
+## Rekgnition
+
+_「托管的视频和图片识别服务。」_
+
+* __🇨🇳 中国区暂时没有。__
+* 💢 __封装的高阶 API 可能会报意义不明的错误。__ 
+  * `CompareFaces` 会[抛出 `InvalidParameterException`](https://forums.aws.amazon.com/thread.jspa?threadID=261754)，但实际上仅仅是因为图片中没有包含人脸，而非参数错误。
+  * `DetectLabels` 会[抛出 `InvalidParameterException`](https://forums.aws.amazon.com/thread.jspa?threadID=250949)，但实际上是因为图片尺寸小于 Rekgnition 支持的最小尺寸（80px × 80px）。
+
+
+
+
+
