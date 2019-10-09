@@ -267,6 +267,16 @@ _「云上虚拟机。」_
 * __在实例上通过 `http://169.254.169.254/latest/meta-data/` 可以获得 Instance Metadata。__ 包括 AMI-ID、IP 地址、MAC 地址等等。
   * 此项功能由 EC2 提供，无论实例上运行的是哪种系统都可以获取。
 
+### EC2 Instance Connect
+
+* __安装 `ec2-instance-connect` 包之后支持针对制定用户上传临时公钥进行登录。__ 60 秒内有效。
+  * 该包会修改 sshd daemon 并在用户远程登录时以 instance metadata 里面的临时公钥来做验证。
+  * EC2 Instance Connect 服务在 instance metadata 中录入临时公钥并在 60 秒后删除。
+  * 🇨🇳 中国区暂时没有 EC2 Instance Connect 服务所以此项功能无法使用。
+  * 💢 __Amazon Linux 2 默认安装并开启 `ec2-instance-connect`。__
+  * __Ubuntu 也支持安装。__ 其余系统不支持。
+
+
 ## EBS（Elastic Block Storage）
 
 _「块存储服务。」_
@@ -632,6 +642,14 @@ _「托管的消息队列。」_
 
 * 🇨🇳 中国区暂未上线。
 
+
+## ElastiCache
+
+_「托管的 Redis/Memcached 数据库。」_
+
+* __仅供云上访问。__ 默认不能从 AWS 之外访问。
+  * 🈲 除非[使用 NAT](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/accessing-elasticache.html)，但不安全且配置麻烦。
+
 ## ECS（Elastic Container Service）
 
 _「托管的 Docker 集群治理工具。」_
@@ -677,13 +695,15 @@ _「云的 7 层防火墙。」_
 
 _「托管的云原生 NoSQL 数据库。」_
 
-> [API](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html)
+> [手册](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html) | [API](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB.html)
 
 * __从 Amazon.com 购物车需求发展而来。__
-  * 有论文。
+  * 有[论文](https://www.dynamodbguide.com/the-dynamo-paper/)，后采用了 [Paxos 算法](https://en.wikipedia.org/wiki/Paxos_%28computer_science%29)。
 * __DynamoDB Accelerator（DAX）指的是内存缓存层。__ 打开 DAX 即可使用内存缓存提升效率。
 * __读写均有体量限制。__ 每单位读 = 4KB/条目/秒，每单位写 = 1KB/条目/秒。
   * 使用最终一致性读取时，每单位读 = 2 × 4KB/条目/秒。
+* __数据默认加密。__ 可以在创建时[选择](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html) DynamoDB 管理密钥（免费），或 KMS 管理密钥。
+  * 可在创建时选择，也可以创建后修改。
 
 ### DynamoDB Streams
 
@@ -768,6 +788,8 @@ _「编程 PaaS 平台。」_
 
 * __Beanstalk 是一种部署 + 运行时服务。__ 不对接 CodeDeploy，而是直接对接 CodeBuild 的产出物。
   * 在 CodePipeline 里面也以部署服务的形式供选择。
+* __安全组在 Beanstalk 之外被关联可能导致环境无法终止。__
+  * Beanstalk 会[为外部的 RDS / ElastiCache 等资源创建安全组](https://forums.aws.amazon.com/message.jspa?messageID=591163)，而这些安全组可能因为无法删除而导致 Beanstalk 无法重建、终止环境。
 
 
 ## API Gateway
