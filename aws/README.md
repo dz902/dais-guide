@@ -180,7 +180,10 @@ _「功能丰富的对象存储。」_
 
 > [手册](https://docs.aws.amazon.com/AmazonS3/latest/dev/batch-ops-basics.html)
 
-* __使用 CSV 作为输入来执行批量操作。__ 也可以使用 Inventory Manifest 来执行操作。
+* __使用 Inventory 来[创建桶内对象列表快照](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-inventory.html)。__ 可选择包含文件尺寸、修改时间等。
+  * 可导出为 CSV / Parque / ORC 等格式。
+  * 可以方便地在 Amazon Athena 中查询。
+* __使用对象列表作为输入来执行批量操作。__
 
 
 ### 上传
@@ -203,7 +206,9 @@ _「功能丰富的对象存储。」_
 
 ## Athena
 
-_「直接针对 S3 上存的半结构化数据跑 SQL。」_
+_「Serverless 版的 Hive。」_
+
+* 💢 __[仅支持 `EXTERNAL` 表](https://docs.aws.amazon.com/athena/latest/ug/creating-tables.html)。__ 且数据需存储在 S3。
 
 ## EC2（Elastic Cloud Compute）
 
@@ -366,6 +371,9 @@ _「云上的虚拟专属网络。」_
 ### EIP（Elastic IP）
 
 * __同时固定公网和私网 IP。__ 公网 IP 从 AWS 自有 IP 池子中随机选取。
+* __默认每 Region 可以有 5 个 EIP。__
+* __在运行中的实例上使用单个 EIP 不收费。__ 申请了但闲置不用反而收费。
+  * 在实例上使用超过 1 个 EIP，多出部分按个收费。
 
 ### ENI（Elastic Network Interface）
 
@@ -448,6 +456,10 @@ _「无服务器计算资源。」_
   * 💢 如果没有 Log Group 创建权限则不会自动创建 Log Group，如果没有写入 Log Group Stream 权限则不会自动写入，但二者均不会报错。
   * ✅ 可使用部分 Managed Policy，比如 AWSLambdaBasicExecutionRole。
   * 🚚 注意 Managed Policy 名字有的前面有前缀（比如 `service-role/`、`job-role/`），有的没有前缀。在 Console 中不会显示前缀，但在 CDK 中使用 `fromAwsManagedPolicyName()` 时需要把前缀加上。
+* 🈲 __请勿在生产环境使用内置的包。__ 虽然可以在函数中直接 `import boto3`，但是内置的包无法保证版本且随时可能更新，导致莫名错误。
+  * ✅ 在生产环境中请使用 Layer 引入外部依赖。
+* __函数对应的 IAM 权限修改后并不一定会立刻生效。__ 因函数的 IAM 权限实际是附着于容器上，而容器的释放时间不定。
+  * ✅ 更新 IAM 权限后应尝试修改函数内容或配置并保存，强行使容器释放更新，以应用新的 IAM 权限。
 
 ## ES（Elasticsearch Service）
 
@@ -847,6 +859,10 @@ _「托管的 API 网关。」_
 ### 错误代码
 
 * __`429 Too Many Requests` 用户请求数量超过了限额。__ 默认每秒 10000 次调用。
+
+### 并发限制
+
+* 💢 __单个 Method 的并发限制[默认等于账号区域并发限制](https://theburningmonk.com/2019/10/the-api-gateway-security-flaw-you-need-to-pay-attention-to/?ck_subscriber_id=527212891)。__ 意味着对一个 Method 进行攻击，就能把单个账号下所有 API 的限额用完。
 
 ### 踩坑
 
