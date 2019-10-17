@@ -16,6 +16,7 @@
 * 🈲 = 不建议执行的操作
 * 💢 = 需要注意的坑
 * 💰 = 会产生额外费用
+* 🎓 = 考试中常见
 
 ## 🇨🇳 中国区特有情况
 
@@ -112,7 +113,9 @@ _「云上的访问权限管理体系。」_
 
 ### MFA（Multi-Factor Authentication）
 
-* ✅ __多因子认证要求用户在登录使用额外的一次性密码。__ 推荐使用，至少应该在 Root Account 或管理员账号上启用。
+* ✅ __MFA（多因子身份验证）要求用户在登录时使用额外的一次性密码。__ 推荐使用，至少应该在 Root Account 或管理员账号上启用。
+* __也可使用 MFA 来保护 API 调用。__
+  * 🎓 __`AssumeRole` 和 [`GetSessionToken`](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_sample-code.html#MFAProtectedAPI-example-getsessiontoken) 均可[传递 MFA 信息](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_configure-api-require.html)。__
 
 ### 测试 Policy
 
@@ -293,6 +296,7 @@ _「块存储服务。」_
 ### 踩坑
 
 * __`growpart` 在 CentOS 上可能执行成功但是仍然报错。__ 用户可尝试直接重启机器再看效果。
+* __`st1` 和 `sc1` [不能用作启动盘](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html)。__
 
 ## ELB（Elastic Load Balancing）
 
@@ -460,8 +464,9 @@ _「无服务器计算资源。」_
   * ✅ 在生产环境中请使用 Layer 引入外部依赖。
 * __函数对应的 IAM 权限修改后并不一定会立刻生效。__ 因函数的 IAM 权限实际是附着于容器上，而容器的释放时间不定。
   * ✅ 更新 IAM 权限后应尝试修改函数内容或配置并保存，强行使容器释放更新，以应用新的 IAM 权限。
+* __Lambda 具备[自动重试](https://docs.aws.amazon.com/lambda/latest/dg/retries-on-errors.html)机制。__ 需要注意。
 
-## ES（Elasticsearch Service）
+## ESS（Elasticsearch Service）
 
 _「托管的 Elasticsearch + Kibana 应用。」_
 
@@ -628,7 +633,6 @@ _「托管的消息队列。」_
 
 > [手册](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) | [限制](https://docs.amazonaws.cn/en_us/streams/latest/dev/service-sizes-and-limits.html) | [价格](https://www.amazonaws.cn/en/kinesis/data-streams/pricing/) | [FAQ](https://www.amazonaws.cn/en/kinesis/data-streams/faqs/)
 
-* __消息会按 Parition Key 被送到不同的 Shard。__ 每个 Shard 提供每秒 1MB 输入，2MB 输出，1000 次 `PUT`。
 * 💢 __默认按收取时间来为消息排序，[不确保精准](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecord.html)。__ 如需精准排序，需在消息发送时手动提供 `SequenceNumberForOrdering` 参数，消息会按此参数从小到大排序。
   * 如不提供，Sequence Number 会自增并保持唯一。
 * 💢 __排序仅针对单个 Shard。__ Sequence Number 也[仅在单个 Shard 内唯一](https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html)。
@@ -638,6 +642,22 @@ _「托管的消息队列。」_
   * 如需最大限度降低延迟，还应在客户端处降低轮询间隔。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/kinesis-low-latency.html)）
   * 使用 Enhanced Fan-Out 推送机制可以降低到约 75ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
   * 与之相对的，是 Apache Kafka 可以优化到个位数 ms 级的传递延迟。（见 [Link](https://engineering.linkedin.com/kafka/benchmarking-apache-kafka-2-million-writes-second-three-cheap-machines)）
+
+#### KCL（Kinesis Client Library）
+
+* __KCL 是 Kinesis Data Stream 的[官方高阶 SDK](https://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html)。__ 比原始 API 更抽象一层。
+* 🎓 __可使用 KCL 的 [`checkpoint`](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-implementation-app-java.html) 方法来设置数据指针。__ 类似书籍的页码，用于指示目前已读取并处理到该 Shard 的哪一条记录。
+  * 在原始 API 中，数据指针被称作 [Shard Iterator](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetShardIterator.html)。
+
+#### Sharding
+
+* __消息会按 Parition Key 被送到不同的 Shard。__ 每个 Shard 提供每秒 1MB 输入，2MB 输出，1000 次 `PUT`。
+* 🎓 __Consumer 的数量不应超过 Shard 数量。__ 虽然没有明确限制，但是在手册针对 KCL 中有[明确建议](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-scaling.html)和[说明](https://docs.aws.amazon.com/streams/latest/dev/troubleshooting-consumers.html#records-belonging-to-the-same-shard)。
+  * __可理解为 1 Shard 最多支持 1 Consumer。__ 但 1 Consumer 可以处理多个 Shard。
+
+#### 自动重试
+
+* __有 Producer 重试和 Consumer 重试两种[情况](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-duplicates.html)。__
 
 ### Data Firehose
 
@@ -715,29 +735,60 @@ _「托管的云原生 NoSQL 数据库。」_
 * __读写均有体量限制。__ 每单位读 = 4KB/条目/秒，每单位写 = 1KB/条目/秒。
   * 使用最终一致性读取时，每单位读 = 2 × 4KB/条目/秒。
 * __数据默认加密。__ 可以在创建时[选择](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html) DynamoDB 管理密钥（免费），或 KMS 管理密钥。
-  * 可在创建时选择，也可以创建后修改。
+  * 也可以创建后修改。
+
+### Partition
+
+* __数据表会根据 Partition Key 而[分成 10GB 大小的 Partition](https://amazonaws-china.com/blogs/database/choosing-the-right-dynamodb-partition-key/)。__
 
 ### DynamoDB Streams
 
-* __DynamoDB 的时序增删改查事件合集。__
+* 🎓 __DynamoDB 的时序增删改查事件合集。__
 
 ### Capacity Unit
 
-* __分 Read Capacity Unit（RCU）和 Write Capacity Unit（WCU）。__ 时间单位为秒。
-  * 1 RCU = 1 个读取操作，最多 4KB 数据（强一致性）。
-  * 1 WCU = 1 个写入操作，最多 1KB 数据。
+* 🎓 __分 Read Capacity Unit（RCU）和 Write Capacity Unit（WCU）。__ 时间单位为秒。
+  * 1 RCU = 1 次读取请求（强一致性），或 2 次读取请求（最终一致性），每次请求可读取最多 4KB 数据。
+  * 1 WCU = 1 次写入请求，最多 1KB 数据。
 * __RCU 和 WCU 均向上舍入。__ 即不足 1 Unit 的按 1 Unit 计算。
-* __使用「最终一致性」模式读取，则每 RCU 可以支持 2 个读取操作或 8KB 数据。__
 * __使用 `ReadItem` 和 `BatchReadItem`， 每读取一个 Item 即算一个读取操作。__ 即 1.5KB 的 Item 会向上舍入成 4KB，6.5KB 的 Item 会向上舍入到 8KB。
-* __使用 `Query`，每次调用算一个读取操作，按返回数据量计算 RCU。__ 
-* __使用 `Scan`，根据扫描的数据总量来计算 RCU。__
 * __读取不存在的 Item 也会消耗读取操作。__ 和正常的读取一致。
+
+### 索引
+
+* __Primary Key 是数据唯一性的依据。__ 可以是单 Partition Key，或者是 Partition Key + Sort Key。
+  * 🎓 __Partition Key 是数据分区的一句，应尽量选择高唯一性的字段。__
+  * __Sort Key 不参与数据分区，但可以用于 Query。__
+* 🎓 __Secondary Index 是单张表的[第二套 Primary Key](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html)。__ 包含 Global 和 Local 两种。
+  * __可以理解为创建了一张子表。__
+  * 💢 __Secondary Index [的值可以重复](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html)。__ 没有唯一性要求。
+* __Global Secondary Index = 与原来完全不同的 Primary Key。__ 
+  * 可随时添加和删除。
+  * 不支持强一致性查询。
+  * 每个 Global Secondary Index 自带 RCU 和 WCU。
+  * 不可请求不在 Index 中的字段。
+* __Local Secondary Index = 与原来的 Primary Key 共享 Partition Key，但提出新的 Sort Key。__
+  * 只能在表创建时创建。
+  * 强一致性或最终一致性。
+  * 与表共享 RCU 和 WCU。
+  * 可请求不在 Index 中的字段。
+
+### 查询
+
+* 🎓 __主要有 Query 和 Scan 两种查询方式。__
+  * Query 针对 Index。
+  * Scan 针对全表或 Secondary Index。
+* 🎓 __Query 按照返回数据消耗 RCU，而 Scan 按照扫描数据量消耗 RCU。__
+  * 二者皆有过滤结果的方式，但是 Scan 的过滤只是把[已经取回的结果扔掉](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Scan.html#Scan.FilterExpression)。
+* __取单条数据时可使用 Get。__ 需提供 Primary Key。
+  * __Primary Key 如果是 Paritition Key + Sort Key，则意味着在 `getItem` 时必须同时提供二者。__
+  * 否则会报「The provided key element does not match the schema」错误。
+  * 如果只想按照 Partition Key 来查询，可以使用 Query。
+* __根据 Primary Key 来取多条数据时可以使用 BatchGet。__
 
 ### 踩坑
 
-* __Primary Key 如果包含 sort key，则意味着在 `getItem` 时必须同时提供 partition key 和 sort key。__
-  * Primary Key 是确保数据唯一性的依据，而 `getItem` 是取出单条数据，所以必须完整提供两个 key，否则会报「The provided key element does not match the schema」错误。
-  * 如果只想按照 partition key 来查询，可以使用 `query`。
+
 * __DynamoDB 使用特定数据格式。__ 如 `{ id: { 'N': 100 } }`，其中的 `N` 代表数据是数字格式。
   * 在 SDK 中可使用 `AWS.DynamoDB.Converter.unmarshall()` / `marshall()` 函数在 DynamoDB 格式与原生格式之间做转换。
 * __索引不等于唯一。__ DynamoDB 的索引对唯一性没有要求。
@@ -787,14 +838,25 @@ _「编程 PaaS 平台。」_
 
 ### EB CLI
 
-* __Beanstalk 提供类似 `npm` 的工具。__
+* __Beanstalk 提供类似 `git` 的工具 `eb`。__
 
 ### 部署模式
 
 * __Rolling Updates = 逐台更新。__
 * __Rolling with Additional Batch = 创建 n 台新机器更新。__ 健康检查成功后关掉 n 台旧机器，如此往复直到全部更新完毕。
 * __Immutable Updates = 开一个新的 ASG 然后开新机器。__ 全部健康检查通过后，机器转移到原来的 ASG，删掉空的 ASG，停掉旧机器。
-* __[Blue/Green Deployment](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html) = 创建新环境并部署到新机器。__ 成功后切换 CNAME 到新的环境。
+* __[Blue/Green Deployment](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html) = [克隆新环境](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html)并部署到新机器。__ 成功后切换 CNAME 到新的环境。
+
+### ELB
+
+* 🎓 __ELB 的类型[只能在创建环境时选择](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.managing.elb.html)__。如果要修改 ELB，不能通过修改环境、克隆环境来达成，必须新建环境。
+* 💢 __Classic Load Balancer 也需要 VPC。__ 虽然 Classic Load Balancer [不必须使用 VPC](https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-getting-started.html)，但是在 Beanstalk 中创建 Classic Load Balancer 时需要选择 VPC 或者在该区域有默认 VPC，否则会报错。
+
+### Docker
+
+* 🎓 __Multi Container Docker 环境底层[使用了 ECS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker_ecs.html)。__
+  * 配置方式与 ECS 一致，使用 Task Definition。
+  * Single Container Docker 就是普通 Docker 环境。可使用 Dockerfile 或者 Task Definition 来配置。
 
 ### 踩坑
 
@@ -881,7 +943,7 @@ _「托管的极简消息队列。」_
 * __最早的 AWS 服务之一。__ 2004 年即[存在](http://jeff-barr.com/2014/08/19/my-first-12-years-at-amazon-dot-com/)但未用于生产，2006 年 6 月 13 日[上线](https://amazonaws-china.com/blogs/aws/amazon_simple_q/)。
 * 💢 __消息处理完后不会自动删除。__ 必须手动删除。
   * __设置队列的 VisibilityTimeout 可以确保在初次返回消息之后一段时间内该消息不会再被返回，避免被不同客户端重复处理。__ 默认 30 秒，最短 0 秒，最长 12 小时。
-* __设置对列的 DelaySeconds 参数，可以让消息延迟返回。__ 默认 0 秒，最长 15 分钟。
+* 🎓 __设置对列的 DelaySeconds 参数，可以[让消息延迟返回](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-delay-queues.html)。__ 默认 0 秒，最长 15 分钟。
   * 也可在单条消息上设置 message timer 参数来覆盖 DelaySeconds 参数。
 
 ### [Short / Long Polling](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html#sqs-long-polling)
@@ -939,6 +1001,7 @@ _「用编程方式来调用 AWS 服务接口。」_
 ## CodeBuild
 
 * __支持「Build 命令」、「项目配置」、「`buildspec.yml`」三个地方设置环境变量。__ [优先顺序](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html)：Build 命令 > 项目配置 > `buildspec.yml`。
+  * 🎓 __构建参数的长度有限制。__ 推荐使用 System Manager Parameter Store 才存储，可以在 `buildspec.yml` 中[直接引用](https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-env-vars.html)。
 * 💢 __默认不支持 VPC 内的资源，需要额外的配置。__ 见 [Link](https://docs.aws.amazon.com/codebuild/latest/userguide/vpc-support.html)。
 
 ## CodeDeploy
@@ -1013,12 +1076,23 @@ _「托管的 Facebook、Google、Amazon 用户身份服务。」_
 * __🇨🇳 中国区暂时没有。__
 * __支持 MFA。__
 
+### Cognito Sync
+
+* 🎓 __可在多个设备间[同步和推送用户信息](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-sync.html)。__ 无需自建后台。
 
 ## CodePipeline
 
 > [手册](https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html)
 
 * __🇨🇳 中国区暂时没有。__
+
+## CodeCommit
+
+* 🇨🇳 __中国区暂时没有。__
+
+### Git
+
+* 🎓 __如果需要通过 HTTPS 方式来使用 CodeCommit，则[需要生成 Git 身份验证信息](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html#setting-up-gc-iam)。__
 
 
 ## Rekgnition
