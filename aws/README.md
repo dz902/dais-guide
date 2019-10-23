@@ -136,6 +136,7 @@ _「功能丰富的对象存储。」_
 * __事件触发。__ 使用 __Events__ 机制可以在文件上传、文件修改等事件发生时触发 __Lambda__。
 * __支持使用 Service Gateway 不走公网访问。__ Service Gateway 不额外收费，推荐使用。
 * __扁平化存储。__ 没有文件夹的概念，但是对结尾为 `/` 的文件做了特殊处理，可以当做文件夹使用。
+  * 这种 `/` 结尾的特殊文件被称作 Prefix。
 
 ### Bucket
 
@@ -164,6 +165,13 @@ _「功能丰富的对象存储。」_
   * 💢 __需要特别注意该选项仅会阻止完全公开的 Bucket Policy。__ 一旦加上 `Condition` 语句，即便是非常公开的条件语句，也不会被阻止。
   * 💢 __比如 `aws:SourceIp: 52.0.0.0/*` 等极其宽泛的 Bucket Policy 也不会被阻止。__
 
+### 并发
+
+* 💢 __S3 不是为大并发设计。__ 每个 Prefix 下的所有文件[仅支持 5500 次/秒的 `GET` 总并发](https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html)，以及 3500 次/秒的 `PUT` 并发。
+  * S3 对 Prefix 数量没有限制，所以理论上并发总数没有限制。
+  * 超过 5500 次/秒的并发需求需要在架构上进行调整，或者使用 CloudFront。
+* 💢 __S3 会限制单 IP 并发请求。__ 当单并发请求数到达 95 左右时，会出现流量控制的情况。
+
 ### Endpoint
 
 * __Global / Local Endpoint。__
@@ -188,7 +196,6 @@ _「功能丰富的对象存储。」_
   * 可以方便地在 Amazon Athena 中查询。
 * __使用对象列表作为输入来执行批量操作。__
 
-
 ### 上传
 
 * __使用 `PUT` 可上传最大 5GB 的文件。__ 使用 Multipart Upload 可上传最大 5TB 的文件。
@@ -198,6 +205,10 @@ _「功能丰富的对象存储。」_
 ### 数据湖
 
 * __数据湖核心。__ S3 是 AWS 数据湖的核心存储机制，也是数据湖的「湖」本体，大部分分析类服务的持久化存储由 S3 提供。
+
+### S3 Analytics
+
+* __可使用 S3 Analytics 分析桶内对象存储的规律。__ 特别是不常访问的对象。
 
 ### 踩坑
 
@@ -264,6 +275,9 @@ _「云上虚拟机。」_
 * __需要从 Console 获取默认管理员密码。__ 针对 Windows 实例，选择「Actions > Get Windows Password」，需要提供 SSH Private Key。
   * ✅ 建议首次登录后使用 Ctrl + Alt + Delete 修改默认密码。
   * 💢 在 OS X 上请按 Fn + Ctrl + Option + Delete。
+* 🎓 __EC2Rescue 是一个 Instance 诊断工具。__ 可以[离线诊断 Windows 实例](https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/ec2rw-gui.html)。
+  * 方法是在另一台诊断实例上安装 EC2Rescue，把无响应/无法连接的 Windows 实例的盘挂载到诊断实例上，运行该工具。
+  * 也有 Linux 版本但是功能较弱。
 
 ### SSH
 
@@ -284,6 +298,12 @@ _「云上虚拟机。」_
   * 💢 __Amazon Linux 2 默认安装并开启 `ec2-instance-connect`。__
   * __Ubuntu 也支持安装。__ 其余系统不支持。
 
+### RI（Reserved Instance）
+
+* __RI 是一个账单机制不是产品机制。__ 所以无法在产品中看到某个 EC2 是否使用了 RI。
+  * 可以在 Cost Explorer 中[查看使用情况统计](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usage-reports.html)。🇨🇳 中国区暂时没有。
+  * 也可以在账单中查看 RI 小时数和非 RI 小时数。
+
 
 ## EBS（Elastic Block Storage）
 
@@ -292,6 +312,12 @@ _「块存储服务。」_
 ### 安全
 
 * ✅ __支持 KMS 全盘加密。__ 不影响 I/O 性能。
+
+### 备份
+
+* __不提供定期备份机制，需要手动备份。__ 或使用脚本。
+* __备份快照基于用量。__ 快照的尺寸等于实际数据使用量。
+* __备份为增量。__ 对卷进行首次快照后，后续新增快照仅会存储变动的部分。
 
 ### 踩坑
 
@@ -379,6 +405,11 @@ _「云上的虚拟专属网络。」_
 * __在运行中的实例上使用单个 EIP 不收费。__ 申请了但闲置不用反而收费。
   * 在实例上使用超过 1 个 EIP，多出部分按个收费。
 
+### NACL
+
+* __无状态的双向端口防火墙。__
+* __每个 NACL 只对应一个 VPC，但可以对应多个 Subnet。__
+
 ### ENI（Elastic Network Interface）
 
 * __虚拟网卡。__
@@ -411,6 +442,19 @@ _「云上的虚拟专属网络。」_
 
 * __VPC CIDR 的第 2 个 IP 地址是 AWS 官方提供的 DNS 服务器。__ 也可以使用 `169.254.169.253`，见 [Link](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-dns.html)。
 * __官方 DNS 服务器可以解析 `.internal` 私有域名，也可以解析 Route 53 Private Hosted Zone 中的地址。__
+
+
+## R53（Route 53）
+
+### `ALIAS` 记录
+
+* __`ALIAS` 是 R53 对 DNS 的[私有扩展](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-choosing-alias-non-alias.html)。__
+  * 🎓 只能指向带公开访问地址的 AWS 资源，比如 ELB、Beanstalk 环境、S3 桶等。
+  * 支持裸域名（zone apex）指向。DNS 原生不支持在裸域名上创建 `CNAME` 指向其他域名，[使用 `ALIAS` + `A` 记录的方式](https://stackoverflow.com/questions/22053472/how-do-i-redirect-a-naked-apex-domain-to-www-using-route-53)可以指向使用其他域名的 AWS 资源。
+  * 💢 `ALIAS` 也[不支持在裸域名上做 `CNAME`](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-values-alias.html)，因为 `ALIAS` 与其对应的记录，名字和类型都必须相同，而裸域名上本身就不支持 `CNAME`。
+  * 会在资源 IP 地址更新时自动同步记录。
+  * 🎓 也可支持指向其他账号内的 AWS 资源。
+  * 🎓 不收费，对比 `CNAME` 记录会收取请求费。
 
 
 ## Lambda
@@ -492,6 +536,14 @@ _「基建即代码工具。」_
 
 * __Template 必须上传到 S3 桶中。__ 选择本地文件[也会自动上传到 S3](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-whatis-howdoesitwork.html)。
 
+### Parameter
+
+* 🎓 __使用单个 Template 时，可以使用 Parameter 来增加复用性。__
+
+### Nested Stack
+
+* __需要复用局部架构时，可嵌套其他 Template，形成 Nested Stack。__
+
 ### CLI
 
 * __`package` 命令可以上传 Assets 到 S3 桶，并自动将 Template 中指向本地文件的部分修改为指向 S3 的地址。__
@@ -558,11 +610,39 @@ _「托管的关系型数据库。」_
   * 平时不启用，当主实例失效时自动启用并更新域名指向。
 * __支持 Read Replica。__ 只读副本，非实时同步。
 
+### 系统维护
+
+* 🎓 __[由 RDS 负责](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.Maintenance.html)操作系统、数据库的补丁及版本升级。__
+* __可以设置 Maintenace Window。__ RDS 将在该维护窗口期对执行维护。
+  * 遇到部分高危问题时补丁会立即应用。
+* __部分补丁需要数据库下线一段时间。__ 比如需要操作系统重启。
+* __使用 Multi-AZ 可以降低对可用性的影响。__
+  * 先在 Standby 上执行维护，将 Standby 升级为 Primary，然后在原 Primary（现 Standby）上执行维护。
+
+### Automated Backup
+
+* __支持自动备份。__ 在选定的时间窗口进行备份。
+* 🈲 __可以禁用。__ 设置 Rentention Period 为 0 时可以禁用。
+  * 不推荐禁用。
+* __备份尺寸小于预留数据库时[不收费](https://amazonaws-china.com/rds/mysql/pricing/?pg=pr&loc=2)。__ 超过时才收费。
+
 ## Aurora（RDS Aurora）
 
 _「托管的云原生数据库。」_
 
 * __有发表专门的论文。__
+
+### Endpoint 类型
+
+* __Cluster Endpoint 是唯一可执行写操作的节点。__ 连接到数据库主实例。
+  * 也可以读。
+  * 每个集群固定有 1 个。
+  * Aurora 管理，不可自建。
+* __Reader Endpoint 是只读节点。__ 连接到数据库的 Read Replica。
+  * 有连接负载均衡，无查询负载均衡。
+  * 每个
+* __Custom Endpoint 是自选节点。__ 连接到你制定的一组实例中的一个。有连接带负载均衡。
+* __Instance Endpoint 是实例节点。__ 连接到单个实例。每个实例均有自己的专属 Instance Endpoint。
 
 ## Redshift
 
@@ -674,6 +754,10 @@ _「托管的消息队列。」_
 
 * 🇨🇳 中国区暂未上线。
 
+### Data Analytics
+
+* 🇨🇳 中国区咱未上线。
+* __使用 SQL 语句对队列中的数据进行流处理并输出结果。__ 也可以使用 Java。
 
 ## ElastiCache
 
@@ -690,6 +774,12 @@ _「托管的 Docker 集群治理工具。」_
 
 * __EC2 在安装 ECS Container Agent 之后才能接入 ECS 集群。__ ECS 管理的 EC2 实例或 ECS-Optimized 型实例已经自带 ECS Container Agent。
 * __ECS Container Agent 是开源的。__ 见 [Link](https://github.com/aws/amazon-ecs-agent)，目前仅支持 EC2。
+
+## ECR（Elastic Container Repository）
+
+_「托管的 Docker 镜像存储服务。」_
+
+* 🎓 __使用 `docker` 命令之前，先运行 `aws ecr get-login` 并[执行其输出的内容](https://docs.aws.amazon.com/AmazonECR/latest/userguide/ECR_AWSCLI.html#AWSCLI_push_image)。__ 这可以让你登录到 ECR 而不是 Docker 官方的镜像存储服务。
 
 ## EKS（Elastic Kubernetes Service）
 
@@ -744,6 +834,11 @@ _「托管的云原生 NoSQL 数据库。」_
 ### DynamoDB Streams
 
 * 🎓 __DynamoDB 的时序增删改查事件合集。__
+* __有几种 View Type。__ 代表 Stream 中的通知数据结构。
+  * `KEYS_ONLY`，只记录条目的 Key。
+  * `NEW_IMAGE`，只记录条目修改后的值。
+  * `OLD_IMAGE`，只记录条目修改前的值。
+  * `NEW_AND_OLD_IMAGES`，同时记录条目修改前后的值。
 
 ### Capacity Unit
 
@@ -786,8 +881,14 @@ _「托管的云原生 NoSQL 数据库。」_
   * 如果只想按照 Partition Key 来查询，可以使用 Query。
 * __根据 Primary Key 来取多条数据时可以使用 BatchGet。__
 
-### 踩坑
+### Global Tables
 
+* __可在指定 Region 创建 Replica 并统一管理。__ 自动同步数据，一般[数秒内](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables_HowItWorks.html)可同步。
+  * __需打开 DynamoDB Streams。__
+* __每个 Replica 均支持读写。__ 写冲突时后者覆盖前者。
+* __不同 Region 的 Replica 之间没有强一致性选项。__ 仅保证最终一致性。
+
+### 踩坑
 
 * __DynamoDB 使用特定数据格式。__ 如 `{ id: { 'N': 100 } }`，其中的 `N` 代表数据是数字格式。
   * 在 SDK 中可使用 `AWS.DynamoDB.Converter.unmarshall()` / `marshall()` 函数在 DynamoDB 格式与原生格式之间做转换。
@@ -836,16 +937,19 @@ _「编程 PaaS 平台。」_
 * __使用 [Saved Configuration](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-configuration-savedconfig.html) 可以将当前配置存为 `.yml` 文件。__ 可以用于创建多个类似的环境，比如 DEV / PROD。
   * 默认存放在 Beanstalk 创建的 S3 桶中。
 
-### EB CLI
-
-* __Beanstalk 提供类似 `git` 的工具 `eb`。__
-
 ### 部署模式
 
 * __Rolling Updates = 逐台更新。__
 * __Rolling with Additional Batch = 创建 n 台新机器更新。__ 健康检查成功后关掉 n 台旧机器，如此往复直到全部更新完毕。
 * __Immutable Updates = 开一个新的 ASG 然后开新机器。__ 全部健康检查通过后，机器转移到原来的 ASG，删掉空的 ASG，停掉旧机器。
 * __[Blue/Green Deployment](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html) = [克隆新环境](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.CNAMESwap.html)并部署到新机器。__ 成功后切换 CNAME 到新的环境。
+
+### VPC
+
+* 💢 __实例需要[通过公网](https://forums.aws.amazon.com/thread.jspa?threadID=164178)与 Beanstalk 通讯。__
+  * 如果实例在 Public Subnet，则需要设置 Public IP。
+  * 如果实例在 Private Subnet，则需要[设置 NAT](https://aws.amazon.com/premiumsupport/knowledge-center/elastic-beanstalk-instance-failure/)。
+* 💢 __实例需要[打开 UDP 123](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/vpc.html) 端口来同步时钟。__ 否则健康检查会失效。
 
 ### ELB
 
@@ -857,6 +961,10 @@ _「编程 PaaS 平台。」_
 * 🎓 __Multi Container Docker 环境底层[使用了 ECS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker_ecs.html)。__
   * 配置方式与 ECS 一致，使用 Task Definition。
   * Single Container Docker 就是普通 Docker 环境。可使用 Dockerfile 或者 Task Definition 来配置。
+
+### EB CLI
+
+* __Beanstalk 提供类似 `git` 的工具 `eb`。__
 
 ### 踩坑
 
@@ -967,6 +1075,10 @@ _「系统管理工具集。」_
 ### Parameter Store
 
 * __安全地存储密码等机密信息。__ 免费存储 10000 条，无额外费用。
+
+### SSM Agent（System Manager Agent）
+
+* 🎓 __可以安装在 EC2 或云下的机器上，让 System Manager 可以统一管理。__ 也[支持 Raspberry Pi](https://amazonaws-china.com/blogs/mt/manage-raspberry-pi-devices-using-aws-systems-manager/) 的 Raspian OS。
 
 ## Secret Manager
 
@@ -1086,7 +1198,26 @@ _「托管的 Facebook、Google、Amazon 用户身份服务。」_
 
 * __🇨🇳 中国区暂时没有。__
 
+## CodeBuild
+
+### Build Phases
+
+* 🎓 __构建分为[不同 Phase](https://docs.aws.amazon.com/codebuild/latest/APIReference/API_BuildPhase.html)。__
+  * `SUBMITTED`，收到构建任务。
+  * `PROVISIONING`，申请构建资源。如失败直接跳到 `COMPLETED`。
+  * `DOWNLOAD_SOURCE`，下载源代码。如失败直接跳到 `FINALIZING`。
+  * `INSTALL`，安装需要的包。如失败直接跳到 `FINALIZING`。
+  * `PRE_BUILD`，执行构建前的操作。如失败直接跳到 `FINALIZING`。
+  * `BUILD`，执行构建操作。
+  * `POST_BUILD`，执行构建后的操作。
+  * `UPLOAD_ARTIFACTS`，上传构建好的应用。构建失败的产物也会上传，方便你调试。
+  * `FINALIZING`，收尾工作。
+  * `COMPLETED`，完成构建。
+* __构建的 Phase 转换规则请见[此链接](https://docs.aws.amazon.com/codebuild/latest/userguide/view-build-details.html#view-build-details-phases)。__
+
 ## CodeCommit
+
+_「托管的 Git 代码仓库。」_
 
 * 🇨🇳 __中国区暂时没有。__
 
@@ -1094,6 +1225,31 @@ _「托管的 Facebook、Google、Amazon 用户身份服务。」_
 
 * 🎓 __如果需要通过 HTTPS 方式来使用 CodeCommit，则[需要生成 Git 身份验证信息](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html#setting-up-gc-iam)。__
 
+### Notifications
+
+* __对接 CloudWatch 进行通知。__
+* __主要针对 Pull Requests 和 Comments 进行通知。__ 后来[增加了状态变化的通知](https://aws.amazon.com/about-aws/whats-new/2017/08/aws-codecommit-now-sends-state-changes-to-amazon-cloudwatch-events-saves-user-preferences-and-adds-tag-details-view/)，即可以在新代码提交时触发。
+  * 💢 新增的状态变化通知并没做进 CodeCommit 一侧的 Notifications 设置中，而需要在 CloudWatch 中选择。
+
+### Triggers
+
+* __在代码提交、创建/删除 Branch 时发送 SNS 通知或触发 Lambda。__
+* 💢 __与 Notification 的功能有重合。__
+
+
+## CodeStar
+
+_「基于 Code* 系列的软件研发管理环境。」_
+
+* 🇨🇳 __中国区暂时没有。__
+* __直接集成了 CodePipeline、CodeCommit、CodeBuild、CodeDeploy 等服务。__
+
+### Member Roles
+
+* __内置不同的 Role 类型。__ 每个项目设置一组。
+  * Owner，即管理员，可管理项目成员。
+  * Contributor，即可读写和执行操作的人员。
+  * Viewer，即只读人员。
 
 ## Rekgnition
 
@@ -1103,6 +1259,38 @@ _「托管的视频和图片识别服务。」_
 * 💢 __封装的高阶 API 可能会报意义不明的错误。__ 
   * `CompareFaces` 会[抛出 `InvalidParameterException`](https://forums.aws.amazon.com/thread.jspa?threadID=261754)，但实际上仅仅是因为图片中没有包含人脸，而非参数错误。
   * `DetectLabels` 会[抛出 `InvalidParameterException`](https://forums.aws.amazon.com/thread.jspa?threadID=250949)，但实际上是因为图片尺寸小于 Rekgnition 支持的最小尺寸（80px × 80px）。
+
+
+## Config
+
+_「托管的配置管理监控服务。」_
+
+* __根据 Rule 评估次数及记录的配置项数量来收费。__
+
+### Rule
+
+* __Change-triggered Rule。__ 在 Config 监测到配置改变时触发。
+* __Periodic Rule。__ 定时触发。
+
+### Scope
+
+* __Rule 创建后必须设置生效范围。__ Rule 仅针对范围内的资源进行评估。
+
+### Aggregated View
+
+* __所有区域的所有资源列表。__
+
+
+## Service Catalog
+
+_「自定义 AWS 服务列表和入口。」_
+
+* 🇨🇳 中国区暂时没有。
+* __基本概念是 Portfolio 和 Product。__ 前者是列表，后者是产品。
+
+
+
+
 
 
 
