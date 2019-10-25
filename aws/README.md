@@ -210,6 +210,10 @@ _「功能丰富的对象存储。」_
 
 * __可使用 S3 Analytics 分析桶内对象存储的规律。__ 特别是不常访问的对象。
 
+### 限制
+
+* 每个 Prefix [3500 写 / 5500 读](https://docs.aws.amazon.com/AmazonS3/latest/dev/optimizing-performance.html)。
+
 ### 踩坑
 
 * 🚚 __RegionalDomainName。__ 在 CFn 中创建 Bucket 之后如果读取 `DomainName` 属性会返回 Global Endpoint，需要改用 `RegionalDomainName`。
@@ -308,6 +312,8 @@ _「云上虚拟机。」_
 ## EBS（Elastic Block Storage）
 
 _「块存储服务。」_
+
+* __支持在线扩容。__ 不能缩容。
 
 ### 安全
 
@@ -906,11 +912,32 @@ _「托管的密钥管理服务。」_
 
 > [手册](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) | [FAQ](https://www.amazonaws.cn/en/kms/faqs/) | [价格](https://www.amazonaws.cn/en/kms/pricing/)
 
+* __KMS 为多个 AWS 服务提供加密机制。__
+* __Master Key 生成或导入后直接进入硬件加密机无法取出。__
+* __硬件加密机使用外部材料生成基于 Master Key + 加密材料的密文。__
+
+### 加解密
+
+* __加密操作需提供 Key ID。__
+* __加密操作最多只能加密 4KB 数据。__
+* __解密操作无需提供 Key ID。__ 密文中已经包含 Key ID。
+* __使用 `GenerateDataKey` 命令来返回随机明文 Key + 密文 Key。__ 明文 Key 用来加密数据，密文 Key 和数据存一起，取出数据时先解密 Key，然后解密数据。
+* __使用 `GenerateDataKeyWithoutPlainText` 命令只返回随机密文 Key。__ 适用于需要延迟一段时间再加密的情况，届时需先解密 Key，然后再用来加密。
+  * 也可用于权限隔离，比如 A 组件负责存放对应的密文 Key，B 组件负责解密 Key 用来加密数据。即 A 组件无需知道密文 Key。
+
+### 信封加密
+
+* __KMS 只支持 4KB 数据加密，所以不能直接加密大量数据。__ 通常加密大量数据使用专门的 Data Key，然后用 KMS 来加密 Data Key。
+  * 相当于把 Data Key 放到了一个安全的信封中，所以叫信封加密。
+  * 由于 KMS 的 Master Key 在硬件加密机中无法取出，所以相对安全。
+
 ### CMK（Customer-Managed Keys）
 
-* __使用 `GenerateDataKey` 命令来返回明文 Key + 密文 Key。__ 明文 Key 用来加密数据，密文 Key 和数据存一起，取出数据时先解密 Key，然后用 Key 解密数据。
-* __使用 `GenerateDataKeyWithoutPlainText` 命令只返回密文 Key。__ 适用于需要延迟一段时间再加密的情况，届时需先解密 Key，然后再加密。
-  * 也可用于权限隔离，比如 A 组件负责存放对应的密文 Key，B 组件负责解密 Key 并用 Key 来加密数据。即 A 组件无需知道密文 Key。
+### Key Rotation
+
+* __可开启自动轮换。__ 
+  * __只会轮换加密材料，不会轮换 Master Key。__
+  * __只能以年为周期。__
 
 ## CLI（Command Line Interface）
 
@@ -1125,6 +1152,13 @@ _「用编程方式来调用 AWS 服务接口。」_
 * __Rolling with additional batch = 额外开 n 台机器进行部署，完成后继续部署 n 台。__ 算力在部署期间不变。
 * __Immutable = 额外开一个 Auto Scaling 组，并完整复制整个应用。__ 算力在部署期间 × 2。
 
+### CodeDeploy Agent
+
+* 💢 __必须安装 Agent 才能部署。__
+* __任何可以安装 Agent 的机器都能部署。__ AWS 之外的机器也可以。
+
+### 踩坑
+
 * 💢 __默认的回滚方式是重新部署。__ 对于蓝绿部署来说，可以手动做环境 URL 切换。
 * 💢 __必须安装 Agent。__ 否则无法部署。
 * 💢 __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
@@ -1158,6 +1192,12 @@ _「CDN 服务。」_
 
 * __免费支持 Server Name Indication（SNI）。__ 如果[使用专属 IP 的 SSL 证书](https://docs.amazonaws.cn/en_us/AmazonCloudFront/latest/DeveloperGuide/cnames-https-dedicated-ip-or-sni.html)（Dedicated IP SSL Certificate），会产生费用。
 
+### 限制
+
+* __单 Distribution 数据吞吐：40 Gbps。__ 软限制可提升。
+* __单 Distribution 请求并发：[10 万次](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)。__ 软限制可提升。
+* __最大文件尺寸：20 GB。__ 硬限制。
+* __每 Orgin 超时限制：4-60 秒。__ 软限制可提升。
 
 ## SNS（Simple Notification Service）
 
@@ -1234,7 +1274,7 @@ _「托管的 Git 代码仓库。」_
 ### Triggers
 
 * __在代码提交、创建/删除 Branch 时发送 SNS 通知或触发 Lambda。__
-* 💢 __与 Notification 的功能有重合。__
+* 💢 __与 Notification 的功能有重合。__ 但较简单，仅支持上述三种场景，不支持 Pull Request 等。
 
 
 ## CodeStar
@@ -1289,9 +1329,18 @@ _「自定义 AWS 服务列表和入口。」_
 * __基本概念是 Portfolio 和 Product。__ 前者是列表，后者是产品。
 
 
+## CloudSearch
 
+* 🇨🇳 中国区暂时没有。
+* __基本单位是 Search Domain。__ 在 Search Domain 下配置 Index。
 
+## Step Functions
 
+### 运行时错误
+
+* __[运行时错误](https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html)类型。__
+  * 状态机定义错误。
+* __出错时默认行为是终止执行整个状态机。__
 
 
 
