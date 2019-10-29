@@ -308,6 +308,28 @@ _「云上虚拟机。」_
   * 可以在 Cost Explorer 中[查看使用情况统计](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usage-reports.html)。🇨🇳 中国区暂时没有。
   * 也可以在账单中查看 RI 小时数和非 RI 小时数。
 
+## Auto Scaling
+
+__「EC2 的弹性伸缩。」__
+
+* __伸缩的单位是 Auto Scaling Group（ASG）。__
+* __[默认缩容优先级](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-termination.html#default-termination-policy)：无保护的 > 实例数量多的 AZ 的 > 满足机型配比的 > Launch Template 最老的 > 隔下一个记账小时最近的 > 随机。__ 
+  * 按上述顺序检查，直到最后剩 1 台机器，关闭它。
+
+### Lifecycle Events
+
+* __[生命周期](https://docs.aws.amazon.com/autoscaling/ec2/userguide/AutoScalingGroupLifecycle.html)：Pending > InService / Standby > Terminating > Terminated。__
+  * __Detached = 拿出 ASG。__ 可以加入其它 ASG。
+  * __[StandBy](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-enter-exit-standby.html) = 仍然在 ASG 内但是不提供服务，方便临时调试然后重新上线。__ 也会[从 ELB 中移除](https://amazonaws-china.com/blogs/aws/auto-scaling-update-lifecycle-standby-detach/)。
+
+### 暂停弹性
+
+* __Auto Scaling 的弹性功能是按照「进程」来管理。__ 可以[暂停某些进程来调整弹性功能](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html)。
+* __核心进程是 `Launch` 和 `Terminate`。__ 暂停前者则不能扩容，暂停后者不能缩容。
+  * `AddToLoadBalancer` = 创建但不加入 ASG。
+  * `AZRebalance` = 通过 `Launch` 和 `Terminate` 让不同 AZ 中的实例数量尽量均等。
+  * `HealthCheck` = 标记实例为 Unhealthy 状态。
+
 
 ## EBS（Elastic Block Storage）
 
@@ -317,18 +339,53 @@ _「块存储服务。」_
 
 ### 安全
 
-* ✅ __支持 KMS 全盘加密。__ 不影响 I/O 性能。
+* ✅ __支持全盘加密。__ 不影响 I/O 性能。
+  * 信封加密由 KMS 提供。
+  * 仅能在创建时选择是否加密，创建后无法修改。
+  * 如需加密需创建备份然后恢复到新的、开启加密的卷。
 
 ### 备份
 
 * __不提供定期备份机制，需要手动备份。__ 或使用脚本。
 * __备份快照基于用量。__ 快照的尺寸等于实际数据使用量。
 * __备份为增量。__ 对卷进行首次快照后，后续新增快照仅会存储变动的部分。
+* __原盘开启加密时，备份即开启加密。__ 反之亦然。
+  * 加密设置不可修改。
+  * 可以复制备份，同时开启加密。
+* __恢复备份时可选择新盘是否加密。__
 
 ### 踩坑
 
 * __`growpart` 在 CentOS 上可能执行成功但是仍然报错。__ 用户可尝试直接重启机器再看效果。
 * __`st1` 和 `sc1` [不能用作启动盘](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html)。__
+
+## EFS（Elastic File System）
+
+_「托管的 NAS。」_
+
+> [FAQ](https://amazonaws-china.com/efs/faq/)
+
+### 容量
+
+* __无需设置容量，自动扩容缩容。__
+* __可存储 PB 级的数据。__
+
+### 连接
+
+* __支持数千客户端同时连接。__
+* __需要在 VPC 中使用 Endpoint 来连接 EFS。__ 可使用安全组来控制对 Endpoint 的访问。
+  * __通过 VPC Peering 可以支持跨 VPC 的访问。
+
+### Performance Modes
+
+* __General Purpose 适合[需要低延迟的场景](https://docs.aws.amazon.com/efs/latest/ug/performance.html)。__ 吞吐相对低。
+* __Max I/O 适合吞吐要求高的场景。__ 吞吐相对高。
+
+### Throughout Modes
+
+* __Bursting Throughput，吞吐根据文件系统尺寸来增减。__
+  * 使用 Burst Credits 来实现突增访问。可突增时间与文件系统尺寸有关。
+* __Provisioned Throughput，直接预置吞吐量。__
 
 ## ELB（Elastic Load Balancing）
 
@@ -502,6 +559,30 @@ _「无服务器计算资源。」_
   * ✅ 函数应该能很好地处理重复事件。
   * ✅ 应该配置 Dead Letter Queue 来避免事件丢失。
 
+### Version
+
+* __一个函数可以同时存在多个版本。__ `$LATEST` 是默认的、最新的版本。
+* __版本可以命名，但在 ARN 中仅以自增数字来指代。__
+
+### Alias
+
+* __一个版本可以有多个别名。__ 
+
+### ARN
+
+* __[Qualified Function ARN](https://docs.aws.amazon.com/lambda/latest/dg/versioning-aliases-permissions.html) 指的是 ARN 末尾带数字版本或 `$LATEST` 的函数 ARN。__
+* __Unqualified Function ARN 指的是 ARN 末尾什么都不带的 ARN。__
+* __Alias ARN 指的是 ARN 末尾带 Alias 名字的 ARN。__
+* __在 IAM 中使用任意一种 ARN，则权限都只针对该 ARN。__ 
+  * __权限没有传递性。__ 即 IAM 中怎么写的，权限就只针对这个 ARN，不会传递给 Alias 或者 `$LATEST` 对应的函数，反之亦然。
+
+### 流量分离
+
+* __可以通过 Alias 来[按权重分离流量](https://docs.aws.amazon.com/lambda/latest/dg/lambda-traffic-shifting-using-aliases.html)。__ 某个 Alias 同时指向两个版本，分别设定权重，则可以达到流量分离。
+  * 不能指向 `$LATEST` 版本。
+* __只支持两个版本之间的流量分离。__
+* __CloudWatch 日志和响应中的 `x-amz-executed-version` 会有版本信息。__
+
 ### 踩坑
 
 * 🚚 __Log Group 无法在 Stack 删除或回退时自动删除。__ Lambda 所附带的 Log Group 是自动创建的，不在 Stack 资源之列，所以不会在 Stack 删除时自动删除。（见 [Link](https://blog.rowanudell.com/cleaning-up-lambda-logs-with-cloudformation/)）
@@ -553,6 +634,16 @@ _「基建即代码工具。」_
 ### CLI
 
 * __`package` 命令可以上传 Assets 到 S3 桶，并自动将 Template 中指向本地文件的部分修改为指向 S3 的地址。__
+
+### 脚本
+
+* __可在 User Data 中直接使用。__
+* __`cfn-init` 在实例[启动时执行脚本](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-init.html)。__
+  * 脚本所需的元数据（比如 `configset`）写在 CFn 模板 `Instance` 元素下的 `Metadata` 元素下的 `AWS::CloudFormation::Init` 元素中。
+* __`cfn-signal` 用于[发送 `CreationPolicy` 或 `WaitCondition` 所需的信号](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-signal.html)。__
+* `cfn-get-metadata`
+* [`cfn-hup`](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-hup.html)
+  * post.update / post.add / post.remove
 
 ### 踩坑
 
@@ -650,6 +741,11 @@ _「托管的云原生数据库。」_
 * __Custom Endpoint 是自选节点。__ 连接到你制定的一组实例中的一个。有连接带负载均衡。
 * __Instance Endpoint 是实例节点。__ 连接到单个实例。每个实例均有自己的专属 Instance Endpoint。
 
+### Global Database
+
+* 🇨🇳 中国不支持。
+* __支持全区域[亚秒级同步](https://amazonaws-china.com/rds/aurora/global-database/)。__
+
 ## Redshift
 
 _「托管的数据仓库。」_
@@ -696,6 +792,11 @@ _「云上监控平台。」_
   * Datapoints to Alarm = 统计结果要超标多少次才触发警报。
 * __Regular Alarm，Period = 60 秒。__ High-Resolution Alarm，Period = 10 / 30 秒。
 
+### CloudWatch Agent
+
+* __在 EC2 和本地机器上安装 Agent 可以向 CloudWatch 打数据和日志。__
+* __系统级日志比如内存占用情况需要 Agent 发送。__ AWS 无权访问此类数据。
+
 ## CloudTrail
 
 _「官方的 API 访问日志。」_
@@ -710,6 +811,11 @@ _「官方的 API 访问日志。」_
   * __Management Event 指的是管理类操作。__ 通常指的是配置或权限的修改。
   * __Data Event 指的是对资源的操作。__ 比如上传文件到 S3。
   * 💢 __默认不记录 Data Event。__
+
+### 安全
+
+* __每个日志文件[都有对应的 Hash 签名](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html)。__ 每小时会传输一个签名合集文件。
+  * 签名使用 CloudTrail 私钥加密，可以使用公钥解密验证日志完整、正确。
 
 ## Kinesis
 
@@ -771,6 +877,7 @@ _「托管的 Redis/Memcached 数据库。」_
 
 * __仅供云上访问。__ 默认不能从 AWS 之外访问。
   * 🈲 除非[使用 NAT](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/accessing-elasticache.html)，但不安全且配置麻烦。
+* 🇨🇳 __中国[暂时不支持存储和传输加密](https://docs.amazonaws.cn/en_us/aws/latest/userguide/elasticache.html)以及使用 `AUTH` 设定密码。__
 
 ## ECS（Elastic Container Service）
 
@@ -956,16 +1063,17 @@ _「编程 PaaS 平台。」_
 
 * __可直接上传代码形成应用。__ 可选择多种编程语言运行环境，以及 Web 和 Worker 两种模板。
 * __支持多种部署方式。__
-  * Canary
-  * Green-Blue
+  * Canary。
+  * Green-Blue。通过 Swap Environment URL 直接支持。
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
 * __使用 `.ebextensions` 文件夹中的 `*.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
 * __使用 [Saved Configuration](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-configuration-savedconfig.html) 可以将当前配置存为 `.yml` 文件。__ 可以用于创建多个类似的环境，比如 DEV / PROD。
   * 默认存放在 Beanstalk 创建的 S3 桶中。
 
-### 部署模式
+### 部署方式
 
+* __All-at-once = 全部机器同时部署。__ 服务会中断。
 * __Rolling Updates = 逐台更新。__
 * __Rolling with Additional Batch = 创建 n 台新机器更新。__ 健康检查成功后关掉 n 台旧机器，如此往复直到全部更新完毕。
 * __Immutable Updates = 开一个新的 ASG 然后开新机器。__ 全部健康检查通过后，机器转移到原来的 ASG，删掉空的 ASG，停掉旧机器。
@@ -986,8 +1094,9 @@ _「编程 PaaS 平台。」_
 ### Docker
 
 * 🎓 __Multi Container Docker 环境底层[使用了 ECS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker_ecs.html)。__
-  * 配置方式与 ECS 一致，使用 Task Definition。
+  * 配置方式与 ECS 一致，使用 Task Definition，配置包含在 `Dockerrun.aws.json` 文件中。
   * Single Container Docker 就是普通 Docker 环境。可使用 Dockerfile 或者 Task Definition 来配置。
+* __使用 `container_commands` 下的 `leader_only` 可以让命令只在一个__
 
 ### EB CLI
 
@@ -1145,12 +1254,37 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 ## CodeDeploy
 
-### 部署方式
+* __有不同[部署方式](https://docs.aws.amazon.com/codedeploy/latest/userguide/deployment-configurations.html#deployment-configuration-lambda)。__
 
-* __All-at-once = 全部机器同时部署。__ 服务会中断。
-* __Rolling = 每次部署 n 台，完成后继续部署 n 台。__ 算力 = 总量减去 n 台。
-* __Rolling with additional batch = 额外开 n 台机器进行部署，完成后继续部署 n 台。__ 算力在部署期间不变。
-* __Immutable = 额外开一个 Auto Scaling 组，并完整复制整个应用。__ 算力在部署期间 × 2。
+### Application
+
+* __支持 EC2 / On-Premise、ECS、Lambda 三种计算平台。__
+
+### Deployment Group
+
+* __对于 EC2 部署，Deployment Group 是目标实例组。__
+* __对于 Lambda 部署，Deployment Group 实际上是部署的配置。__ 不是目标函数组。
+  * 目标函数在 `AppSpec` 文件中定义。
+
+### `AppSpec`
+
+* __部署配置文件。__ [定义](https://docs.aws.amazon.com/codedeploy/latest/userguide/reference-appspec-file-example.html#appspec-file-example-lambda)各种 Hook、命令、Task Definition。
+
+### EC2 / On-Premise 部署方式
+
+* __AllAtOnce。__
+* __HalfAtATime。__
+* __OneAtATime。__
+
+### ECS 部署方式
+
+* __AllAtOnce。__
+
+### Lambda 部署方式
+
+* __AllAtOnce。__
+* __Canary。__
+* __Linear。__
 
 ### CodeDeploy Agent
 
@@ -1283,6 +1417,7 @@ _「基于 Code* 系列的软件研发管理环境。」_
 
 * 🇨🇳 __中国区暂时没有。__
 * __直接集成了 CodePipeline、CodeCommit、CodeBuild、CodeDeploy 等服务。__
+* __提供中心控制面板。__
 
 ### Member Roles
 
@@ -1342,6 +1477,66 @@ _「自定义 AWS 服务列表和入口。」_
   * 状态机定义错误。
 * __出错时默认行为是终止执行整个状态机。__
 
+
+## OpsWorks
+
+### 三种服务
+
+* __OpsWorks Stacks，OpsWorks Chef，OpsWorks Puppet。__
+  * 其中 Stacks 也是 Chef。
+
+### Stack / Layer / App
+
+* __Stack 指一个完整应用所需的所有资源，其中包含 Layer。__
+* __Layer 是同类资源集合，比如 EC2、ECS、RDS。__ 一个 Layer 也代表了一种职能，比如都是做 Web 服务器的，都是做缓存的，等等。
+  * __新建资源的时候需要归拢到 Layer 下才能部署。__
+* __App 是应用配置信息，包含了部署的源代码位置、配置等等。__ 部署 Stack 的时候需要选择 App 来部署。
+  * __Recipe 可以读取 App 中的配置信息。__
+* __这样的拆分方式可以将某个 App 部署到多个不同的 Stack。__
+
+### Cookbook / Recipe
+
+* __Cookbook [包含一套 Attribute、Template、Recipe 文件](https://docs.aws.amazon.com/opsworks/latest/userguide/workingcookbook-installingcustom-components.html)。__
+  * Attribute 文件包含可引用的变量。
+  * Template 文件是用来生成配置文件的模板。
+  * Recipe 文件是 Ruby 脚本文件用于安装应用。
+
+### OpsWorks Agent
+
+* __安装了 Agent 的实例会[持续与 OpsWorks 服务通讯](https://docs.aws.amazon.com/opsworks/latest/userguide/workinginstances-autohealing.html)。__ 如果 5 分钟没有通讯，OpsWorks 会认为该实例已经失效。
+* __如果 Layer 的 Auto Healing 功能开启，则 OpsWorks 会自动替换失效的实例。__
+  * __Auto Healing 默认开启。__ 
+
+### Lifecycle Events
+
+* __Setup。__ 实例启动后触发，运行 Recipe。
+  * 该阶段也包含 Deploy。
+* __Configure。__ 在某个实例上线或者下线时，在所有实例上都会触发。
+  * 适合用于更新实例配置。
+  * 添加 ELB 时也会触发。
+* __Deploy。__ 运行部署 Recipe。
+* __Undeploy。__
+* __Shutdown。__ 在实例终止之前运行。
+* __重启实例不会触发任何 Lifecycle Events。__
+
+### Auto Scaling
+
+* __OpsWorks 仅支持内置的 Scaling 策略。__ [不支持 Auto Scaling](https://amazonaws-china.com/opsworks/stacks/faqs/)。
+  * 可按时间和负载来自动伸缩。
+  * 因为实例状态由 OpsWorks 管理，所以外部的修改是不允许的，从而不支持 Auto Scaling。
+
+### 部署方法
+
+* __在创建新的实例时会自动部署。__
+  * 可能[会导致线上版本不一致](https://docs.aws.amazon.com/opsworks/latest/userguide/best-deploy.html)问题。
+  * ✅ 建议使用专门的仓库或分支来存储已获准上线的代码，并只从该仓库拉代码。
+* __使用 Deploy 命令来[正式部署](https://docs.aws.amazon.com/opsworks/latest/userguide/workingapps-deploying.html)。__ 
+* __使用 Update Custom Cookbook 来更新 Cookbook。__ 更新 Cookbook 后需[手动触发部署](https://docs.aws.amazon.com/opsworks/latest/userguide/workingstacks-commands.html)。
+
+### 部署模式
+
+* __OpsWorks 可以做滚动部署、蓝绿部署等，但是[需要自己手动操作](https://docs.aws.amazon.com/opsworks/latest/userguide/best-deploy.html)。__
+  * 蓝绿部署需要借助 Route 53 等 DNS 来切换 URL 入口。
 
 
 
