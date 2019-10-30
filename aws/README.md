@@ -222,10 +222,38 @@ _「功能丰富的对象存储。」_
 * __`PUT` 操作既用于上传文件，又用于修改现有文件的属性。__ 见 [Link](https://docs.aws.amazon.com/cli/latest/reference/s3api/put-object.html)。
 
 
+## Storage Gateway
+
+_「基于 S3 的本地存储备份延展机制。」_
+
+* __将本地数据备份、延展至 S3。__
+* __通过在本地安装 VM，或使用硬件来实现 Gateway 功能。__
+
+### 三种界面
+
+* __File Gateway。__ 将 S3 挂载成 NAS 盘。
+  * 通过 NFS 或 SMB 来访问 S3 上的文件。
+  * 存储的文件可以直接在 S3 上访问。
+* __Volume Gateway。__ 将 S3 挂载成 SAN 盘。
+  * 通过 iSCSI 协议。
+* __Tape Gateway。__ 将 Glacier 挂载成 SAN 盘。
+
+### Stored vs. Cached Volume
+
+* __Volume Gateway 均会在 S3 上存储全量数据。__
+* __Volume Gateway 均可以可以定期生成 EBS 快照。__
+* __Stored Volume 将所有文件存在本地。__ 主要用于备份本地数据到 S3。
+* __Cached Volume 将常用文件存在本地。__ 主要用于为本地提供低延迟数据访问。
+* __Volume 上挂载的本地磁盘分为不同功能。__
+  * __Cache Storage 磁盘用于存储常用文件以及上传中的文件的副本。__ Stored Volume 会存储所有文件在本地，所以没有 Cache Storage。
+  * __Upload Buffer 磁盘用于存储上传中的文件。__
+
+
 ## Athena
 
 _「Serverless 版的 Hive。」_
 
+* 🇨🇳 中国区暂时不支持。
 * 💢 __[仅支持 `EXTERNAL` 表](https://docs.aws.amazon.com/athena/latest/ug/creating-tables.html)。__ 且数据需存储在 S3。
 
 ## EC2（Elastic Cloud Compute）
@@ -308,13 +336,18 @@ _「云上虚拟机。」_
   * 可以在 Cost Explorer 中[查看使用情况统计](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usage-reports.html)。🇨🇳 中国区暂时没有。
   * 也可以在账单中查看 RI 小时数和非 RI 小时数。
 
+
 ## Auto Scaling
 
 __「EC2 的弹性伸缩。」__
 
-* __伸缩的单位是 Auto Scaling Group（ASG）。__
-* __[默认缩容优先级](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-termination.html#default-termination-policy)：无保护的 > 实例数量多的 AZ 的 > 满足机型配比的 > Launch Template 最老的 > 隔下一个记账小时最近的 > 随机。__ 
-  * 按上述顺序检查，直到最后剩 1 台机器，关闭它。
+* __弹性伸缩目标组叫做 Auto Scaling Group（ASG）。__
+
+### Scale In
+
+* __[缩容时终止机器的优先级](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-termination.html#default-termination-policy)：无保护的 > 实例数量多的 AZ 的 > 满足机型配比的 > Launch Template 最老的 > 隔下一个记账小时最近的 > 随机。__ 
+  * 按上述顺序检查，直到最后剩 1 台虚机，关闭它，再重复此流程直到缩容完毕。
+  * 该优先级仅针对缩容时终止机器，如果在不需要缩容时修改 Launch Configuration 或者 Launch Template，[不会自动终止并新开机器](https://docs.aws.amazon.com/autoscaling/ec2/userguide/change-launch-config.html)。
 
 ### Lifecycle Events
 
@@ -322,7 +355,7 @@ __「EC2 的弹性伸缩。」__
   * __Detached = 拿出 ASG。__ 可以加入其它 ASG。
   * __[StandBy](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-enter-exit-standby.html) = 仍然在 ASG 内但是不提供服务，方便临时调试然后重新上线。__ 也会[从 ELB 中移除](https://amazonaws-china.com/blogs/aws/auto-scaling-update-lifecycle-standby-detach/)。
 
-### 暂停弹性
+### Scaling Suspension
 
 * __Auto Scaling 的弹性功能是按照「进程」来管理。__ 可以[暂停某些进程来调整弹性功能](https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html)。
 * __核心进程是 `Launch` 和 `Terminate`。__ 暂停前者则不能扩容，暂停后者不能缩容。
@@ -330,6 +363,18 @@ __「EC2 的弹性伸缩。」__
   * `AZRebalance` = 通过 `Launch` 和 `Terminate` 让不同 AZ 中的实例数量尽量均等。
   * `HealthCheck` = 标记实例为 Unhealthy 状态。
 
+### Health Check
+
+* __设置 Grace Period 来安装应用。__ 健康检查会在 Grace Period 之后再执行。
+  * __也可以使用 Lifecycle Hook 来暂缓实例进入 InService 状态。__
+* __如果检查结果为 Unhealthy 则会立即启动替换流程。__
+* __可以使用 `set-instance-health` 来手动设置健康状态。__
+  * __仅适用于已经暂停缩容的 Auto Scaling 组，因为自动缩容是瞬间发生，通常无法来得及手动设置。__
+
+### Launch Configuration / Launch Template
+
+* __二者类似，都是启动 EC2 实例时的配置。__ 方便 Auto Scaling 自动开机器以及复用。
+* __Template 支持版本，支持默认参数和传入参数。__ 并且可以在 Auto Scaling 中选择使用默认版本、最新版本或者特定版本的 Template。
 
 ## EBS（Elastic Block Storage）
 
@@ -374,7 +419,7 @@ _「托管的 NAS。」_
 
 * __支持数千客户端同时连接。__
 * __需要在 VPC 中使用 Endpoint 来连接 EFS。__ 可使用安全组来控制对 Endpoint 的访问。
-  * __通过 VPC Peering 可以支持跨 VPC 的访问。
+  * __通过 VPC Peering 可以支持[跨 VPC 的访问](https://docs.aws.amazon.com/efs/latest/ug/manage-fs-access-vpc-peering.html)。
 
 ### Performance Modes
 
@@ -655,6 +700,13 @@ _「基建即代码工具。」_
 * __单向同步。__ CFn 模板修改后，资源会同步，但是资源创建完成后再进行修改，不会体现在模板上。
   * __有 Drift Detection 可以监测模板与资源之间的差异。__ 🇨🇳 中国区暂时没有。
 
+## SAM（Serverless Application Model）
+
+_「CloudFormation 的 Serverless 扩展版。」_
+
+* 🎓 __CFn 支持的 SAM 都支持。__
+* 🎓 __SAM 特别为 API Gateway、Lambda 和 DynamoDB 做了[优化和扩展](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template.html#serverless-sam-template-simpletable)。__
+
 ## CDK（Cloud Development Kit）
 
 _「封装成程序代码的 CFn。」_
@@ -715,6 +767,7 @@ _「托管的关系型数据库。」_
 * __部分补丁需要数据库下线一段时间。__ 比如需要操作系统重启。
 * __使用 Multi-AZ 可以降低对可用性的影响。__
   * 先在 Standby 上执行维护，将 Standby 升级为 Primary，然后在原 Primary（现 Standby）上执行维护。
+  * 💢 Multi-AZ 也[不一定能解决](https://amazonaws-china.com/blogs/database/best-practices-for-upgrading-amazon-rds-for-mysql-and-amazon-rds-for-mariadb/)升级带来的宕机问题。
 
 ### Automated Backup
 
@@ -749,6 +802,25 @@ _「托管的云原生数据库。」_
 ## Redshift
 
 _「托管的数据仓库。」_
+
+* __公开服务。__ Redshift 默认走公网路径。
+
+### 加密
+
+* __创建集群的时候可以开启加密。__ 也可创建后开启。
+* __创建后开启加密，会自动迁移数据到加密的集群。__ 
+  * 迁移时集群会进入只读状态。
+  * 控制台状态显示为 `resizing`。
+
+### Enhanced VPC Routing
+
+* __开启后 `COPY` 和 `UNLOAD` 命令将走 VPC 而非公网。__
+  * 可通过 Endpoint 访问 S3 上的数据。
+* __开启后可使用 VPC 相关的功能，如安全组、NACL 等。__
+
+### Snapshot
+
+* __可把设置将 Snapshot 复制到第二个 Region。__
 
 ### Spectrum
 
@@ -812,6 +884,15 @@ _「官方的 API 访问日志。」_
   * __Data Event 指的是对资源的操作。__ 比如上传文件到 S3。
   * 💢 __默认不记录 Data Event。__
 
+### Event History
+
+* __默认会把 API 日志记录到 Event History。__ Event History 中的日志会[保存 90 天](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html)。
+
+### Trail
+
+* __Trail 可以将日志[保存到 S3](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-getting-started.html)。__
+* __Trail 针对所有 Region。__
+
 ### 安全
 
 * __每个日志文件[都有对应的 Hash 签名](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html)。__ 每小时会传输一个签名合集文件。
@@ -835,6 +916,11 @@ _「托管的消息队列。」_
   * 使用 Enhanced Fan-Out 推送机制可以降低到约 75ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
   * 与之相对的，是 Apache Kafka 可以优化到个位数 ms 级的传递延迟。（见 [Link](https://engineering.linkedin.com/kafka/benchmarking-apache-kafka-2-million-writes-second-three-cheap-machines)）
 
+#### 限制
+
+* __消息尺寸限制 1MB。__
+* __消息存储最长 24 小时。__
+
 #### KCL（Kinesis Client Library）
 
 * __KCL 是 Kinesis Data Stream 的[官方高阶 SDK](https://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html)。__ 比原始 API 更抽象一层。
@@ -850,6 +936,15 @@ _「托管的消息队列。」_
 #### 自动重试
 
 * __有 Producer 重试和 Consumer 重试两种[情况](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-duplicates.html)。__
+
+#### vs. SQS
+
+* __单条信息的 ACK/FAIL，就用 SQS。__ Kinesis 需要用户手动维护位置指针，而 SQS 会自动删除 ACK 后的数据，自动重发 FAIL 的数据。
+* __SQS 可以针对单条信息做延迟。__
+* __SQS 可以动态增加更多 Reader。__ Kinesis 需要用户提前规划 Shard 数量。
+* __SQS 不保证顺序。__ Kinesis 保证单个 Shard 内消息的顺序。
+  * 也可以使用 [SQS FIFO Queue](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html) 来确保顺序。
+* __Kinesis 通过 Sharding 来提供更好的并行消费能力。__
 
 ### Data Firehose
 
@@ -885,7 +980,8 @@ _「托管的 Docker 集群治理工具。」_
 
 ### ECS Container Agent
 
-* __EC2 在安装 ECS Container Agent 之后才能接入 ECS 集群。__ ECS 管理的 EC2 实例或 ECS-Optimized 型实例已经自带 ECS Container Agent。
+* __EC2 在安装 Agent 之后才能接入 ECS 集群。__ ECS 管理的 EC2 实例或 ECS-Optimized 型实例已经自带 ECS Container Agent。
+  * Agent 也[支持 Windows](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ECS_Windows.html)。
 * __ECS Container Agent 是开源的。__ 见 [Link](https://github.com/aws/amazon-ecs-agent)，目前仅支持 EC2。
 
 ## ECR（Elastic Container Repository）
@@ -1059,7 +1155,7 @@ _「命令行界面。」_
 
 ## Beanstalk（Elastic Beanstalk）
 
-_「编程 PaaS 平台。」_
+_「托管的 PaaS。」_
 
 * __可直接上传代码形成应用。__ 可选择多种编程语言运行环境，以及 Web 和 Worker 两种模板。
 * __支持多种部署方式。__
@@ -1068,6 +1164,9 @@ _「编程 PaaS 平台。」_
 * __会使用 S3 桶来存储应用配置。__ 每个部署应用的 Region 会放一个桶。
   * 💢 默认不做存储加密，需自行开启加密。
 * __使用 `.ebextensions` 文件夹中的 `*.config` 文件来定制环境。__ 支持多种定制，比如安装某些包，创建用户、用户组等等。
+  * `commands` 用于（在部署前）执行命令。
+  * `files` 用于生成文件。
+  * 还可以[修改各种配置](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options.html#configuration-options-recommendedvalues)。
 * __使用 [Saved Configuration](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/environment-configuration-savedconfig.html) 可以将当前配置存为 `.yml` 文件。__ 可以用于创建多个类似的环境，比如 DEV / PROD。
   * 默认存放在 Beanstalk 创建的 S3 桶中。
 
@@ -1095,12 +1194,24 @@ _「编程 PaaS 平台。」_
 
 * 🎓 __Multi Container Docker 环境底层[使用了 ECS](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker_ecs.html)。__
   * 配置方式与 ECS 一致，使用 Task Definition，配置包含在 `Dockerrun.aws.json` 文件中。
-  * Single Container Docker 就是普通 Docker 环境。可使用 Dockerfile 或者 Task Definition 来配置。
-* __使用 `container_commands` 下的 `leader_only` 可以让命令只在一个__
+  * Single Container Docker 就是普通 Docker 环境。可使用 Dockerfile / `Dockerrun.aws.json` 或者 Task Definition 来配置。
+  * `Dockerrun.aws.json` 包含 v1（单 Docker 环境）和 v2（多 Docker 环境）[两个版本](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/create_deploy_docker_ecs.html#create_deploy_docker_ecs_dockerrun)，二者差异很大。
+* __使用 `container_commands` 下的 `leader_only` 可以让命令只在一个实例上运行。__
+
+### Hooks
+
+* 🎓 __使用 `/opt/elasticbeanstalk/hooks/appdeloy` 目录可以在[部署前后执行脚本](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/custom-platform-hooks.html)。__ 比如 `pre/`、`post/` 等。
+  * 还有 `configdeploy` 等。
 
 ### EB CLI
 
 * __Beanstalk 提供类似 `git` 的工具 `eb`。__
+
+### `.ebextensions`
+
+* 🎓 __注意[优先级问题](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options.html#configuration-options-recommendedvalues)。__
+* 🎓 如果通过 CLI 和 Console 创建环境，则 `InstanceType` 参数[无法](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html)在 `.ebextensions` 中修改。
+  * ??? 需要验证：是不是用 API 就可以
 
 ### 踩坑
 
@@ -1108,6 +1219,8 @@ _「编程 PaaS 平台。」_
   * 在 CodePipeline 里面也以部署服务的形式供选择。
 * __安全组在 Beanstalk 之外被关联可能导致环境无法终止。__
   * Beanstalk 会[为外部的 RDS / ElastiCache 等资源创建安全组](https://forums.aws.amazon.com/message.jspa?messageID=591163)，而这些安全组可能因为无法删除而导致 Beanstalk 无法重建、终止环境。
+* __在生产环境中，官方建议把数据库[放在环境之外](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/using-features.managing.db.html)。__ 以避免更新环境和应用时影响数据库。
+  * 也方便执行 Blue/Green 部署。
 
 
 ## API Gateway
@@ -1138,6 +1251,10 @@ _「托管的 API 网关。」_
 ### Model
 
 * __用于指示 Request 和 Response 的格式。__
+
+### Mapping Template
+
+* __用于转换 Request / Response。__ 比如为新版 API 提供向后兼容。 
 
 ### Lambda
 
@@ -1286,10 +1403,21 @@ _「用编程方式来调用 AWS 服务接口。」_
 * __Canary。__
 * __Linear。__
 
+### Trigger
+
+* __在部署过程的各个节点可以发送消息到 SNS Topic。__
+
 ### CodeDeploy Agent
 
 * 💢 __必须安装 Agent 才能部署。__
 * __任何可以安装 Agent 的机器都能部署。__ AWS 之外的机器也可以。
+
+### On-Premise 部署
+
+* 🎓 __从 On-Premise 机器调用 CodeDeploy 时，为确保安全，需要不断通过 `AssumeRole` 来[更新临时安全凭证](https://docs.aws.amazon.com/codedeploy/latest/userguide/register-on-premises-instance-iam-session-arn.html)。__
+  * Role 将需要包含 `AWSCodeDeployFullAccess` 权限，才能添加实例到 Deployment Group。
+  * Agent 将需要同上权限，才能调用 CodeDeploy API 来[轮询新的部署并执行](https://docs.aws.amazon.com/codedeploy/latest/userguide/instances-on-premises-prerequisites.html)。
+* 🎓 __对 On-Premise 的机器必须使用 Tag。__ 因为它们没有 Instance ID。
 
 ### 踩坑
 
@@ -1353,24 +1481,46 @@ _「消息推送服务。」_
 * ✅ __用一个消息队列（如 SQS）来解耦发布者和订阅者。__ 订阅者订阅消息队列，而不直接订阅 Topic。
   * 牺牲部分实时性，换取并行处理、弹性伸缩等好处。
 
+
 ## Cognito
 
-_「托管的 Facebook、Google、Amazon 用户身份服务。」_
+_「托管的社交、OIDC、SAML 用户身份验证服务。」_
 
 > [手册](https://docs.aws.amazon.com/cognito/latest/developerguide/what-is-amazon-cognito.html)
 
 * __🇨🇳 中国区暂时没有。__
 * __支持 MFA。__
+* __支持 OIDC、SAML。__
+
+### OIDC
+
+### SAML
 
 ### Cognito Sync
 
 * 🎓 __可在多个设备间[同步和推送用户信息](https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-sync.html)。__ 无需自建后台。
+
 
 ## CodePipeline
 
 > [手册](https://docs.aws.amazon.com/codepipeline/latest/userguide/welcome.html)
 
 * __🇨🇳 中国区暂时没有。__
+
+### Custom Job Worker
+
+* __创建自定义的 Stage。__ 到该 Stage 时会生成一个 Job 等待处理。
+* __使用 `PollJobs` API 来主动轮询。__ 并用 `AcknowledgeJob` 来告知 Pipeline 任务已经获取。
+* __使用 `PutJobSuccessResult` 来告知 Pipeline 执行结果。__ 或者 `PutJobFailedResult`。
+* __异步调用时可在 `PutJobSuccessResult` 中包含 Continuation Token。__ 则下次 `PollJobs` 时此 Job 会再次出现并包含 Continuation Token。
+  * 方便追踪长时间/异步运行的结果。
+
+### Lambda
+
+* __Pipeline 可以[主动调用 Lambda](https://docs.aws.amazon.com/codepipeline/latest/userguide/actions-invoke-lambda-function.html#actions-invoke-lambda-function-add-action)。__ 用于更新环境等等。
+  * 与 Lambda 不同，Custom Job Worker 需要自行轮询 Job。
+* __Lambda 有自己的 Stage。__ 选择 Action Provider 为 Lambda 即可。
+* ??? __需要实验：Lambda 的异步任务，CodePipeline 会多久调用一次？__
 
 ## CodeBuild
 
@@ -1395,9 +1545,12 @@ _「托管的 Git 代码仓库。」_
 
 * 🇨🇳 __中国区暂时没有。__
 
+
 ### Git
 
 * 🎓 __如果需要通过 HTTPS 方式来使用 CodeCommit，则[需要生成 Git 身份验证信息](https://docs.aws.amazon.com/codecommit/latest/userguide/setting-up-gc.html#setting-up-gc-iam)。__
+* __可自行上传 SSH Public Key 到 IAM 账号下的 SSH Key for CodeCommit 来启用 Git/SSH 操作。__
+  * 🎓 意味着可以复用已有的 SSH Key。
 
 ### Notifications
 
