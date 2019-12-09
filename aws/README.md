@@ -110,6 +110,7 @@ _「云上的访问权限管理体系。」_
 ### Policy
 
 * 🚥 __使用 `simulate-custom-policy` 可以模拟该 Policy 的效果。__ 见 [Link](https://docs.aws.amazon.com/cli/latest/reference/iam/simulate-custom-policy.html)。
+* __必须[指定 `Version`](https://forums.aws.amazon.com/thread.jspa?threadID=164329) 才能使用模板变量。__
 
 ### MFA（Multi-Factor Authentication）
 
@@ -263,6 +264,10 @@ _「云上虚拟机。」_
 ### 总览
 
 * ✅ __默认使用 SSH 并以 Key Pairs 验证。__ 🈲 若要密码登录虚拟机，需要进行额外的操作。
+* __状态检查失败时会[触发自动恢复](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html#TroubleshootingInstanceRecovery)。__ 也有恢复失败的可能。
+  * 可创建 CloudWatch 来监控 [`SystemCheckFailed_System`](https://forums.aws.amazon.com/thread.jspa?threadID=151523) 来了解自动恢复的情况。
+  * `SystemCheckFailed_System` 指的是网络包不能触达你的实例，即 AWS 基建出了问题（电、网络、机器故障）。
+  * `SystemCheckFailed_Instance` 指的是网络包不能触达你实例上的操作系统，即你的配置出了问题。
 
 ### 购买方式
 
@@ -504,6 +509,8 @@ _「云上的虚拟专属网络。」_
   * __Subnet 路由表中有记录指向 IGW 则为 Public Subnet。__ 否则就是 Private。
 * __NAT Gateway（NAT-GW）。__ 出口向互联网网关（IPv4），需置于 Public Subnet 中。
   * 设置路由后，Private Subnet 的实例可以通过 NAT-GW 单向访问互联网，用于下载更新包等。
+  * 需要挂靠 EIP。
+  * NAT 网关与 NAT 访问者如果不在一个 AZ 可能产生跨 AZ 数据传输费用。
 * __Ingress / Egress Gateway。__ 入口 / 出口向互联网网关（IPv6）。
 
 ### EIP（Elastic IP）
@@ -585,6 +592,20 @@ _「无服务器计算资源。」_
 * __可以通过 Environment 变量传入参数。__ Function 将可以访问这些参数。
   * 🇨🇳 中国区暂时不支持。
 
+### Transform
+
+* 🇨🇳 __中国区暂时[不支持](https://forums.aws.amazon.com/thread.jspa?messageID=825915&tstart=0) `AWS::Include`。__
+
+### Context
+
+* __通过 `context` 参数可以获得运行时信息。__
+  * 比如函数名字、剩余执行时间。
+
+### 权限
+
+* __Function Policy 负责谁能调 Lambda。__
+* __Execution Role 负责 Lambda 能做什么。__
+
 ### Layer
 
 * __可以复用的依赖。__ 不用每个函数去打包依赖。
@@ -603,6 +624,9 @@ _「无服务器计算资源。」_
 * 💢 __异步调用的队列是最终一致的。__ 即同样的事件可能被发送两次，也可能因为函数处理不及而事件已经过期所以还没发送给函数就被删掉。
   * ✅ 函数应该能很好地处理重复事件。
   * ✅ 应该配置 Dead Letter Queue 来避免事件丢失。
+* 💢 与编程语言的并发、异步，比如 `async` / `await` 是两个概念。
+  * 编程语言实现的并发和异步，实际上函数会持续执行并等待异步调用结束，会持续计费。
+  * Lambda 的异步调用进入队列后不会计费。
 
 ### Version
 
@@ -741,6 +765,10 @@ _「封装成程序代码的 CFn。」_
 * __S3、LogGroup 资源默认 `UpdatePolicy` / `DeletionPolicy` 为 `Retain`。__ 此项与 CFn 的默认行为相反。（版本：v1.2.0，见 [#2601](https://github.com/aws/aws-cdk/issues/2601)）
 * __部分资源缺乏 `DeletionPolicy` 抽象。__ 部分资源需要直接调用底层的接口才能修改，而且底层接口名字混乱，方法名字是 `RemovalPolicy`，值又是 `DESTROY`。
   * ✅ 对于 Construct，可以在传入参数时直接带 `removalPolicy: cdk.RemovalPolicy.DESTROY`
+* __`VPC` 资源默认[使用子网数量为 2](https://docs.aws.amazon.com/cdk/api/latest/python/aws_cdk.aws_ec2.README.html#vpc)，除非你同时制定账户 ID 和 Region。__
+  * 修改 `maxAZs` 参数也无效。
+* __`VPC` 资源默认会创建 1 个公有和 1 个私有子网。__ 除非你把 `subnetConfigurations` 参数设置为空数组。
+* __`VPC` 资源默认创建的子网不支持设置 IP 段。__ 仅支持设置掩码。
 
 ## IoT Greengrass
 
@@ -757,6 +785,7 @@ _「托管的关系型数据库。」_
 * __支持 Multi-AZ。__ 高可用副本，实时同步。
   * 可读写。
   * 平时不启用，当主实例失效时自动启用并更新域名指向。
+  * 使用 Multi-AZ 时[不可指定 AZ](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-rds-database-instance.html#cfn-rds-dbinstance-availabilityzone)。
 * __支持 Read Replica。__ 只读副本，非实时同步。
 
 ### 系统维护
@@ -781,6 +810,7 @@ _「托管的关系型数据库。」_
 _「托管的云原生数据库。」_
 
 * __有发表专门的论文。__
+* __可使用 Clone 功能跨 AZ 复制数据库。__
 
 ### Endpoint 类型
 
@@ -804,6 +834,12 @@ _「托管的云原生数据库。」_
 _「托管的数据仓库。」_
 
 * __公开服务。__ Redshift 默认走公网路径。
+* __[不支持](https://aws.amazon.com/redshift/faqs/) Multi-AZ。__ 如果需要可以在两个 AZ 分别起。
+
+### Node
+
+* __Leader Node 负责获取请求并解析成执行计划。__
+* __Compute Node 负责执行实际的计划。__
 
 ### 加密
 
@@ -824,7 +860,11 @@ _「托管的数据仓库。」_
 
 ### Spectrum
 
-* __直接从 S3 中扫描半结构化数据进行分析。__ 跟 Athena 的功能雷同。
+* __直接从 S3 中扫描半结构化数据进行分析。__ 跟 Athena 的功能雷同，但是支持与 Redshift 内的数据进行 `JOIN` 操作。
+
+### `COPY` 命令
+
+* __从 S3、EMR、DDB 或任意支持 SSH 的主机上导入数据。__
 
 ### 踩坑
 
@@ -841,10 +881,12 @@ _「云上监控平台。」_
 * __自定义 Metric 支持 [High-Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html#high-resolution-metrics)。__ 默认数据收集频率 1 分钟 1 次，High-Resolution 数据收集频率为 1 秒钟 1 次。
   * __区别于 EC2 [Detail Monitoring](https://docs.amazonaws.cn/en_us/AWSEC2/latest/UserGuide/using-cloudwatch.html)。__ EC2 服务每 5 分钟发送一次实例指标给 CloudWatch，开启 Detailed Monitoring 之后每 1 分钟发送一次。
 
-### Events（CloudWatch Events）
+### CloudWatch Events
 
 * __Events 是消息队列。__ 有相对独立的 ARN 和 API 名字（events）。
   * __后续发展成了 EventBridge。__ 🇨🇳 中国区暂时没有。
+* __可设置定时触发。__
+  * 💢 __使用 Cron 定时触发时时时区[固定为 UTC](https://stackoverflow.com/questions/51887396/setting-the-same-timezone-everywhere-in-cloudwatch)。__
 
 ### Logs（CloudWatch Logs）
 
@@ -864,8 +906,10 @@ _「云上监控平台。」_
   * Datapoints to Alarm = 统计结果要超标多少次才触发警报。
 * __Regular Alarm，Period = 60 秒。__ High-Resolution Alarm，Period = 10 / 30 秒。
 
-### CloudWatch Agent
+### CloudWatch Logs Agent / CloudWatch Agent
 
+* 🎓 __上一版的名字是 CloudWatch Logs Agent。__ 主要负责打日志，只支持 Linux。
+  * __新版的名字叫做 CloudWatch Agent。__ 可以打日志和一些系统指标，支持 Linux 和 Windows。
 * __在 EC2 和本地机器上安装 Agent 可以向 CloudWatch 打数据和日志。__
 * __系统级日志比如内存占用情况需要 Agent 发送。__ AWS 无权访问此类数据。
 
@@ -906,6 +950,8 @@ _「托管的消息队列。」_
 
 > [手册](https://docs.aws.amazon.com/streams/latest/dev/introduction.html) | [限制](https://docs.amazonaws.cn/en_us/streams/latest/dev/service-sizes-and-limits.html) | [价格](https://www.amazonaws.cn/en/kinesis/data-streams/pricing/) | [FAQ](https://www.amazonaws.cn/en/kinesis/data-streams/faqs/)
 
+#### 踩坑
+
 * 💢 __默认按收取时间来为消息排序，[不确保精准](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecord.html)。__ 如需精准排序，需在消息发送时手动提供 `SequenceNumberForOrdering` 参数，消息会按此参数从小到大排序。
   * 如不提供，Sequence Number 会自增并保持唯一。
 * 💢 __排序仅针对单个 Shard。__ Sequence Number 也[仅在单个 Shard 内唯一](https://docs.aws.amazon.com/streams/latest/dev/key-concepts.html)。
@@ -913,7 +959,7 @@ _「托管的消息队列。」_
   * 在取数据时[提供 Sequence Number](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetRecords.html) 来确保只取 Sequence Number 之后的新消息。
 * 💢 __传递延迟较高。__ 目前仅支持亚秒级的传递延迟（200-1000ms）。（见 [Link](https://aws.amazon.com/about-aws/whats-new/2015/03/amazon-kinesis-propagation-delay-reduction/)、[Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
   * 如需最大限度降低延迟，还应在客户端处降低轮询间隔。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/kinesis-low-latency.html)）
-  * 使用 Enhanced Fan-Out 推送机制可以降低到约 75ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
+  * 使用 Enhanced Fan-Out 推送机制可以降低到约 70ms。（见 [Link](https://docs.amazonaws.cn/en_us/streams/latest/dev/building-consumers.html)）
   * 与之相对的，是 Apache Kafka 可以优化到个位数 ms 级的传递延迟。（见 [Link](https://engineering.linkedin.com/kafka/benchmarking-apache-kafka-2-million-writes-second-three-cheap-machines)）
 
 #### 限制
@@ -921,17 +967,30 @@ _「托管的消息队列。」_
 * __消息尺寸限制 1MB。__
 * __消息存储最长 24 小时。__
 
+#### Sharding
+
+* __消息会按 Parition Key 被送到不同的 Shard。__ 每个 Shard 提供每秒 1MB 输入，2MB 输出，1000 次 `PUT`。
+* 🎓 __Consumer 的数量不应超过 Shard 数量。__ 虽然没有明确限制，但是在手册针对 KCL 中有[明确建议](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-scaling.html)和[说明](https://docs.aws.amazon.com/streams/latest/dev/troubleshooting-consumers.html#records-belonging-to-the-same-shard)。
+  * __可理解为 1 Shard 最多支持 1 Consumer。__ 但 1 Consumer 可以处理多个 Shard。
+
 #### KCL（Kinesis Client Library）
 
 * __KCL 是 Kinesis Data Stream 的[官方高阶 SDK](https://docs.aws.amazon.com/streams/latest/dev/developing-consumers-with-kcl.html)。__ 比原始 API 更抽象一层。
 * 🎓 __可使用 KCL 的 [`checkpoint`](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-implementation-app-java.html) 方法来设置数据指针。__ 类似书籍的页码，用于指示目前已读取并处理到该 Shard 的哪一条记录。
   * 在原始 API 中，数据指针被称作 [Shard Iterator](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_GetShardIterator.html)。
 
-#### Sharding
+#### Enhanced Fan-Out
 
-* __消息会按 Parition Key 被送到不同的 Shard。__ 每个 Shard 提供每秒 1MB 输入，2MB 输出，1000 次 `PUT`。
-* 🎓 __Consumer 的数量不应超过 Shard 数量。__ 虽然没有明确限制，但是在手册针对 KCL 中有[明确建议](https://docs.aws.amazon.com/streams/latest/dev/kinesis-record-processor-scaling.html)和[说明](https://docs.aws.amazon.com/streams/latest/dev/troubleshooting-consumers.html#records-belonging-to-the-same-shard)。
-  * __可理解为 1 Shard 最多支持 1 Consumer。__ 但 1 Consumer 可以处理多个 Shard。
+* __基于 [HTTP/2](https://docs.aws.amazon.com/streams/latest/dev/building-enhanced-consumers-api.html) 推送。__
+* __使用 Enhanced Fan-Out 的消费者可专享 2MB/Shard 带宽，不使用的消费者则共享 2MB/Shard 带宽。__
+* __每个流[最多同时连接 20 个](https://docs.aws.amazon.com/streams/latest/dev/introduction-to-enhanced-consumers.html) Enhanced Fan-Out 消费者。__
+* __使用 KCL 及 Enhanced Fan-Out 时，消费者将[同时订阅所有的流](https://docs.aws.amazon.com/streams/latest/dev/introduction-to-enhanced-consumers.html)。__
+  * 也可以自己注册 Consumer，并订阅到单个 Shard。
+
+#### `PutRecord` vs. `PutRecords`
+
+* __`PutRecords` [不能保证顺序](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)。__ 因为遇到错误时会直接处理下一条消息。
+* __需要确保顺序，使用 `PutRecords` 并只写到一个 Shard。__
 
 #### 自动重试
 
@@ -1005,6 +1064,12 @@ _「托管的 Hadoop 生态。」_
 
 > [价格](https://www.amazonaws.cn/en/elasticmapreduce/pricing/)
 
+### Nodes
+
+* __Master Node 负责集群管理、任务分发。__
+* __Core Node 负责存储和计算。__
+* __Task Node 仅负责计算。__
+
 ## SageMaker
 
 _「托管的 Jupyter Notebook。」_
@@ -1061,7 +1126,7 @@ _「托管的云原生 NoSQL 数据库。」_
 ### 索引
 
 * __Primary Key 是数据唯一性的依据。__ 可以是单 Partition Key，或者是 Partition Key + Sort Key。
-  * 🎓 __Partition Key 是数据分区的一句，应尽量选择高唯一性的字段。__
+  * 🎓 __Partition Key 是数据分区的依据，应尽量选择高唯一性的字段。__
   * __Sort Key 不参与数据分区，但可以用于 Query。__
 * 🎓 __Secondary Index 是单张表的[第二套 Primary Key](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/SecondaryIndexes.html)。__ 包含 Global 和 Local 两种。
   * __可以理解为创建了一张子表。__
@@ -1333,6 +1398,12 @@ _「系统管理工具集。」_
 
 * 🎓 __可以安装在 EC2 或云下的机器上，让 System Manager 可以统一管理。__ 也[支持 Raspberry Pi](https://amazonaws-china.com/blogs/mt/manage-raspberry-pi-devices-using-aws-systems-manager/) 的 Raspian OS。
 
+### Session Manager
+
+* __可以通过 AWS CLI 来连接 EC2 实例，[无需专门开放端口](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-getting-started-enable-ssh-connections.html)。__
+  * __需要安装 Agent。__
+
+
 ## Secret Manager
 
 _「秘密管理工具。」_
@@ -1343,9 +1414,13 @@ _「秘密管理工具。」_
 
 ## Glue
 
-_「数据归拢工具。」_
+_「无服务器版 ETL 工具。」_
 
-* __使用爬虫获取内部数据并发布到 Glue Data Catalog。__
+* __底层使用 Spark。__
+
+### Data Catalog
+
+* __数据源的原信息列表。__
 
 
 ## X-Ray
@@ -1421,10 +1496,11 @@ _「用编程方式来调用 AWS 服务接口。」_
 
 ### 踩坑
 
-* 💢 __默认的回滚方式是重新部署。__ 对于蓝绿部署来说，可以手动做环境 URL 切换。
-* 💢 __必须安装 Agent。__ 否则无法部署。
-* 💢 __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
+* __默认的回滚方式是重新部署。__ 对于蓝绿部署来说，可以手动做环境 URL 切换。
+* __必须安装 Agent。__ 否则无法部署。
+* __EC2 的权限错误会导致部署步骤全部被「跳过」。__ 如果你发现所有部署步骤都被 Skip 掉，可先检查 EC2 是否有足够权限访问 S3 桶。
   * 可在 EC2 实例上查看日志，位置是 `/var/log/aws/codedeploy-agent/codedeploy-agent.log`。
+* 🎓 __只能[部署同一 Region 内的应用](https://aws.amazon.com/codedeploy/faqs/#Regions)。__ 如有跨 Region 部署需要，需要先复制应用到目标 Region 再部署。
 
 ## Organizations
 
